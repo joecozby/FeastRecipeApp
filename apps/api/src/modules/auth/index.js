@@ -106,4 +106,37 @@ router.get(
   })
 )
 
+// PATCH /api/auth/profile
+router.patch(
+  '/profile',
+  requireAuth,
+  [
+    body('display_name').optional().trim().notEmpty().withMessage('display_name cannot be blank'),
+    body('bio').optional().isString(),
+    validate,
+  ],
+  asyncHandler(async (req, res) => {
+    const { display_name, bio } = req.body
+    const updates = []
+    const params = []
+    if (display_name !== undefined) { params.push(display_name); updates.push(`display_name = $${params.length}`) }
+    if (bio !== undefined)          { params.push(bio);           updates.push(`bio = $${params.length}`) }
+    if (!updates.length) throw new AppError('No valid fields to update', 400)
+    params.push(req.user.sub)
+    await pool.query(
+      `UPDATE profiles SET ${updates.join(', ')}, updated_at = now() WHERE user_id = $${params.length}`,
+      params
+    )
+    const { rows: [user] } = await pool.query(
+      `SELECT u.id, u.email, u.role, u.created_at,
+              p.display_name, p.bio, p.avatar_url
+       FROM users u
+       LEFT JOIN profiles p ON p.user_id = u.id
+       WHERE u.id = $1`,
+      [req.user.sub]
+    )
+    res.json(user)
+  })
+)
+
 export default router
