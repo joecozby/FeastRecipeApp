@@ -98,5 +98,17 @@ export function startNutritionWorker() {
   })
 
   logger.info('Nutrition worker started')
+
+  // Backfill: enqueue any recipe that has no snapshot yet
+  pool.query(
+    `SELECT r.id FROM recipes r
+     LEFT JOIN nutrition_snapshots ns ON ns.recipe_id = r.id
+     WHERE r.deleted_at IS NULL AND ns.recipe_id IS NULL`
+  ).then(({ rows }) => {
+    if (!rows.length) return
+    logger.info(`Nutrition backfill: enqueuing ${rows.length} recipes without snapshots`)
+    return Promise.all(rows.map(r => enqueueNutrition(r.id).catch(() => {})))
+  }).catch(err => logger.warn(`Nutrition backfill query failed: ${err.message}`))
+
   return worker
 }
