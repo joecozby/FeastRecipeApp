@@ -1,0 +1,1 @@
+export default function RecipeDetailPage() { return <div style={{padding:'32px'}}><h1 style={{fontSize:'24px',fontWeight:700}}>RecipeDetailPage</h1><p style={{color:'var(--color-text-muted)',marginTop:'8px'}}>Coming in the next steps.</p></div> }
