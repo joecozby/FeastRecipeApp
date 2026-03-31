@@ -1,4 +1,4 @@
-import { useState, FormEvent, ReactNode } from 'react'
+import { useState, useEffect, FormEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useImportRecipe, useImportJobStatus } from '../api/recipes'
 import { Button } from '../components/ui/Button'
@@ -31,10 +31,11 @@ function StatusCard({ icon, title, description, color, action }: {
 
 export default function ImportPage() {
   const navigate = useNavigate()
-  const [tab, setTab]     = useState<TabId>('url')
-  const [input, setInput] = useState('')
-  const [jobId, setJobId] = useState<string | null>(null)
-  const [error, setError] = useState('')
+  const [tab, setTab]           = useState<TabId>('url')
+  const [input, setInput]       = useState('')
+  const [jobId, setJobId]       = useState<string | null>(null)
+  const [error, setError]       = useState('')
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null)
 
   const importMutation = useImportRecipe()
   const { data: jobStatus } = useImportJobStatus(jobId)
@@ -46,6 +47,18 @@ export default function ImportPage() {
   const isInstagramBlocked = jobStatus?.error_message === 'INSTAGRAM_BLOCKED'
   const isFailed     = jobStatus?.status === 'failed'
   const isProcessing = !!jobId && jobStatus?.status !== 'done' && jobStatus?.status !== 'failed'
+
+  // Auto-switch to Paste Text when Instagram scraping is blocked
+  useEffect(() => {
+    if (isInstagramBlocked) {
+      setBlockedUrl(input)
+      setTab('text')
+      setInput('')
+      setJobId(null)
+      importMutation.reset()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInstagramBlocked])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -62,8 +75,7 @@ export default function ImportPage() {
   }
 
   function handleReset() { setJobId(null); setError(''); importMutation.reset() }
-  function switchToText() { setTab('text'); setJobId(null); setError('') }
-  function switchTab(id: TabId) { setTab(id); setError(''); setJobId(null) }
+  function switchTab(id: TabId) { setTab(id); setError(''); setJobId(null); setBlockedUrl(null) }
 
   return (
     <div style={{ maxWidth: '600px' }}>
@@ -100,19 +112,6 @@ export default function ImportPage() {
           color="var(--color-primary)" />
       )}
 
-      {isInstagramBlocked && (
-        <div style={{
-          background: '#fff7ed', border: '1px solid #fed7aa',
-          borderRadius: 'var(--radius-lg)', padding: '24px', marginBottom: '24px',
-        }}>
-          <p style={{ fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>Instagram blocked the import</p>
-          <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '16px' }}>
-            Instagram prevented us from reading that post. Copy the caption text and paste it below instead.
-          </p>
-          <Button onClick={switchToText} variant="secondary">Paste caption text instead</Button>
-        </div>
-      )}
-
       {isFailed && !isInstagramBlocked && (
         <StatusCard icon="❌" title="Import failed"
           description={jobStatus?.error_message ?? 'Something went wrong. Please try again.'}
@@ -138,10 +137,31 @@ export default function ImportPage() {
             </div>
           )}
           {tab === 'text' && (
-            <Textarea label="Recipe text" value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Paste the full recipe here — title, ingredients, and steps."
-              style={{ minHeight: '240px' }} autoFocus />
+            <>
+              {blockedUrl && (
+                <div style={{
+                  background: '#fff7ed', border: '1px solid #fed7aa',
+                  borderRadius: 'var(--radius-md)', padding: '14px 16px',
+                  display: 'flex', flexDirection: 'column', gap: '6px',
+                }}>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: '#92400e' }}>
+                    Instagram blocked the automatic import
+                  </p>
+                  <p style={{ fontSize: '13px', color: '#78350f', lineHeight: 1.5 }}>
+                    Open{' '}
+                    <a href={blockedUrl} target="_blank" rel="noopener noreferrer"
+                      style={{ color: '#c2410c', fontWeight: 500 }}>
+                      this post
+                    </a>
+                    , tap the three-dot menu → <strong>Copy text</strong>, then paste it below.
+                  </p>
+                </div>
+              )}
+              <Textarea label="Recipe text" value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Paste the full recipe here — title, ingredients, and steps."
+                style={{ minHeight: '240px' }} autoFocus />
+            </>
           )}
           {error && <p style={{ fontSize: '13px', color: '#dc2626', margin: 0 }}>{error}</p>}
           <div style={{ display: 'flex', gap: '12px' }}>
