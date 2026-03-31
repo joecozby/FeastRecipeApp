@@ -17,6 +17,7 @@ const CookbooksPage      = lazy(() => import('./pages/cookbooks/CookbooksPage'))
 const CookbookDetailPage = lazy(() => import('./pages/cookbooks/CookbookDetailPage'))
 const GroceryPage        = lazy(() => import('./pages/GroceryPage'))
 const ProfilePage        = lazy(() => import('./pages/ProfilePage'))
+const AiPage             = lazy(() => import('./pages/AiPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +59,7 @@ export default function App() {
               <Route path="/cookbooks/:id"  element={<CookbookDetailPage />} />
               <Route path="/grocery"        element={<GroceryPage />} />
               <Route path="/profile"        element={<ProfilePage />} />
+              <Route path="/ai"             element={<AiPage />} />
             </Route>
 
             {/* Catch-all */}

@@ -12,6 +12,7 @@ import groceryRouter from './modules/grocery/index.js'
 import searchRouter from './modules/search/index.js'
 import tagsRouter from './modules/tags/index.js'
 import mediaRouter from './modules/media/index.js'
+import aiRouter from './modules/ai/index.js'
 
 const app = express()
 
@@ -47,6 +48,7 @@ app.use('/api/grocery-lists', groceryRouter)
 app.use('/api/search', searchRouter)
 app.use('/api/tags', tagsRouter)
 app.use('/api/media', mediaRouter)
+app.use('/api/ai', aiRouter)
 
 // 404 handler for unmatched API routes
 app.use('/api/*', (_req, res) => {

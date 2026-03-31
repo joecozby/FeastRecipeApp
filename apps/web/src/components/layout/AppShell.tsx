@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/search',    label: 'Search',    icon: '🔍' },
   { to: '/cookbooks', label: 'Cookbooks', icon: '📖' },
   { to: '/grocery',   label: 'Grocery',   icon: '🛒' },
+  { to: '/ai',        label: 'AI Chef',   icon: '✨' },
 ]
 
 export function PrivateRoute() {
