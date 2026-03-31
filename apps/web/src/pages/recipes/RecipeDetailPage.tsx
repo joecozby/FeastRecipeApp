@@ -328,7 +328,9 @@ export default function RecipeDetailPage() {
       {nutrition && (
         <div style={{ marginBottom: '32px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700 }}>Nutrition per serving</h2>
+            <h2 style={{ fontSize: '16px', fontWeight: 700 }}>
+              {scale === 1 ? 'Nutrition per serving' : `Nutrition for ${currentServings} serving${currentServings !== 1 ? 's' : ''}`}
+            </h2>
             {nutrition.is_estimated && (
               <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>
                 ESTIMATED
@@ -337,12 +339,12 @@ export default function RecipeDetailPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px' }}>
             {([
-              { label: 'Calories', value: nutrition.per_serving.calories, unit: 'kcal' },
-              { label: 'Protein',  value: nutrition.per_serving.protein,  unit: 'g' },
-              { label: 'Fat',      value: nutrition.per_serving.fat,      unit: 'g' },
-              { label: 'Carbs',    value: nutrition.per_serving.carbs,    unit: 'g' },
-              { label: 'Fiber',    value: nutrition.per_serving.fiber,    unit: 'g' },
-              { label: 'Sodium',   value: nutrition.per_serving.sodium,   unit: 'mg' },
+              { label: 'Calories', value: Math.round(nutrition.per_serving.calories * scale), unit: 'kcal' },
+              { label: 'Protein',  value: Math.round(nutrition.per_serving.protein  * scale), unit: 'g' },
+              { label: 'Fat',      value: Math.round(nutrition.per_serving.fat      * scale), unit: 'g' },
+              { label: 'Carbs',    value: Math.round(nutrition.per_serving.carbs    * scale), unit: 'g' },
+              { label: 'Fiber',    value: Math.round(nutrition.per_serving.fiber    * scale), unit: 'g' },
+              { label: 'Sodium',   value: Math.round(nutrition.per_serving.sodium   * scale), unit: 'mg' },
             ] as const).map(({ label, value, unit }) => (
               <div key={label} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '12px', textAlign: 'center' }}>
                 <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>
