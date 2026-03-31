@@ -1,1 +1,328 @@
-export default function RecipeEditPage() { return <div style={{padding:'32px'}}><h1 style={{fontSize:'24px',fontWeight:700}}>RecipeEditPage</h1><p style={{color:'var(--color-text-muted)',marginTop:'8px'}}>Coming in the next steps.</p></div> }
+import { useState, FormEvent, useEffect } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useRecipe, useUpdateRecipe, useSaveRecipeContent } from '../../api/recipes'
+import { Button } from '../../components/ui/Button'
+import { Input, Textarea } from '../../components/ui/Input'
+
+interface IngredientRow {
+  raw_text: string
+  group_label: string
+  is_optional: boolean
+}
+
+interface InstructionRow {
+  body: string
+  group_label: string
+}
+
+const inputStyle = {
+  padding: '8px 10px',
+  borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-surface)',
+  fontSize: '14px',
+  color: 'var(--color-text)',
+  fontFamily: 'var(--font-sans)',
+}
+
+export default function RecipeEditPage() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const { data: recipe, isLoading } = useRecipe(id!)
+  const updateMeta = useUpdateRecipe(id!)
+  const saveContent = useSaveRecipeContent(id!)
+
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [cuisine, setCuisine] = useState('')
+  const [difficulty, setDifficulty] = useState<'' | 'easy' | 'medium' | 'hard'>('')
+  const [prepTime, setPrepTime] = useState('')
+  const [cookTime, setCookTime] = useState('')
+  const [servings, setServings] = useState('')
+
+  const [ingredients, setIngredients] = useState<IngredientRow[]>([])
+  const [instructions, setInstructions] = useState<InstructionRow[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (!recipe) return
+    setTitle(recipe.title ?? '')
+    setDescription(recipe.description ?? '')
+    setCuisine(recipe.cuisine ?? '')
+    setDifficulty(recipe.difficulty ?? '')
+    setPrepTime(recipe.prep_time_mins ? String(recipe.prep_time_mins) : '')
+    setCookTime(recipe.cook_time_mins ? String(recipe.cook_time_mins) : '')
+    setServings(recipe.base_servings ? String(recipe.base_servings) : '')
+    setIngredients(
+      (recipe.ingredients ?? []).map((i) => ({
+        raw_text: i.raw_text,
+        group_label: i.group_label ?? '',
+        is_optional: i.is_optional ?? false,
+      }))
+    )
+    setInstructions(
+      (recipe.instructions ?? []).map((s) => ({
+        body: s.body,
+        group_label: s.group_label ?? '',
+      }))
+    )
+    setTags((recipe.tags ?? []).map((t) => t.name))
+  }, [recipe])
+
+  async function handleSave(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (!title.trim()) { setError('Title is required.'); return }
+    try {
+      await updateMeta.mutateAsync({
+        title: title.trim(),
+        description: description.trim() || null,
+        cuisine: cuisine.trim() || null,
+        difficulty: (difficulty || null) as 'easy' | 'medium' | 'hard' | null,
+        prep_time_mins: prepTime ? parseInt(prepTime) : null,
+        cook_time_mins: cookTime ? parseInt(cookTime) : null,
+        base_servings: servings ? parseInt(servings) : null,
+      })
+      await saveContent.mutateAsync({
+        ingredients: ingredients
+          .filter((i) => i.raw_text.trim())
+          .map((i, idx) => ({
+            raw_text: i.raw_text.trim(),
+            group_label: i.group_label.trim() || null,
+            is_optional: i.is_optional,
+            display_order: idx,
+          })),
+        instructions: instructions
+          .filter((s) => s.body.trim())
+          .map((s, idx) => ({
+            body: s.body.trim(),
+            group_label: s.group_label.trim() || null,
+            step_number: idx + 1,
+          })),
+        tags: tags.map((name) => ({ name })),
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch {
+      setError('Save failed. Please try again.')
+    }
+  }
+
+  function addIngredient() {
+    setIngredients([...ingredients, { raw_text: '', group_label: '', is_optional: false }])
+  }
+  function removeIngredient(i: number) {
+    setIngredients(ingredients.filter((_, idx) => idx !== i))
+  }
+  function updateIngredient(i: number, field: keyof IngredientRow, value: string | boolean) {
+    setIngredients(ingredients.map((row, idx) => idx === i ? { ...row, [field]: value } : row))
+  }
+
+  function addInstruction() {
+    setInstructions([...instructions, { body: '', group_label: '' }])
+  }
+  function removeInstruction(i: number) {
+    setInstructions(instructions.filter((_, idx) => idx !== i))
+  }
+  function updateInstruction(i: number, field: keyof InstructionRow, value: string) {
+    setInstructions(instructions.map((row, idx) => idx === i ? { ...row, [field]: value } : row))
+  }
+  function moveInstruction(i: number, dir: -1 | 1) {
+    const next = [...instructions]
+    const j = i + dir
+    if (j < 0 || j >= next.length) return
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setInstructions(next)
+  }
+
+  function addTag() {
+    const t = tagInput.trim().toLowerCase()
+    if (t && !tags.includes(t)) setTags([...tags, t])
+    setTagInput('')
+  }
+  function removeTag(t: string) {
+    setTags(tags.filter((x) => x !== t))
+  }
+
+  if (isLoading) return <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Loading...</div>
+  if (!recipe) return <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Recipe not found.</div>
+
+  const isPending = updateMeta.isPending || saveContent.isPending
+
+  return (
+    <div style={{ maxWidth: '720px' }}>
+      <Link
+        to={`/recipes/${id}`}
+        style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '20px' }}
+      >
+        ← Back to recipe
+      </Link>
+
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '28px' }}>Edit Recipe</h1>
+
+      <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+
+        {/* Details */}
+        <section>
+          <h2 style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '16px' }}>Details</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+            <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} style={{ minHeight: '100px' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <Input label="Cuisine" value={cuisine} onChange={(e) => setCuisine(e.target.value)} placeholder="e.g. Italian" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text)' }}>Difficulty</label>
+                <select
+                  value={difficulty}
+                  onChange={(e) => setDifficulty(e.target.value as '' | 'easy' | 'medium' | 'hard')}
+                  style={{ ...inputStyle, width: '100%' }}
+                >
+                  <option value="">—</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
+              <Input label="Prep time (mins)" type="number" value={prepTime} onChange={(e) => setPrepTime(e.target.value)} placeholder="15" />
+              <Input label="Cook time (mins)" type="number" value={cookTime} onChange={(e) => setCookTime(e.target.value)} placeholder="30" />
+              <Input label="Base servings" type="number" value={servings} onChange={(e) => setServings(e.target.value)} placeholder="4" />
+            </div>
+          </div>
+        </section>
+
+        {/* Ingredients */}
+        <section>
+          <h2 style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '16px' }}>Ingredients</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {ingredients.map((ing, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 150px auto auto', gap: '8px', alignItems: 'center' }}>
+                <input
+                  value={ing.raw_text}
+                  onChange={(e) => updateIngredient(i, 'raw_text', e.target.value)}
+                  placeholder="e.g. 2 cups flour"
+                  style={inputStyle}
+                />
+                <input
+                  value={ing.group_label}
+                  onChange={(e) => updateIngredient(i, 'group_label', e.target.value)}
+                  placeholder="Group (optional)"
+                  style={inputStyle}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  <input
+                    type="checkbox"
+                    checked={ing.is_optional}
+                    onChange={(e) => updateIngredient(i, 'is_optional', e.target.checked)}
+                  />
+                  Optional
+                </label>
+                <button
+                  type="button"
+                  onClick={() => removeIngredient(i)}
+                  style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '4px' }}
+                >×</button>
+              </div>
+            ))}
+            <Button type="button" variant="ghost" onClick={addIngredient} style={{ alignSelf: 'flex-start' }}>
+              + Add ingredient
+            </Button>
+          </div>
+        </section>
+
+        {/* Instructions */}
+        <section>
+          <h2 style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '16px' }}>Instructions</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {instructions.map((step, i) => (
+              <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{
+                  width: '28px', height: '28px', borderRadius: '50%',
+                  background: 'var(--color-border)', color: 'var(--color-text-muted)',
+                  fontSize: '13px', fontWeight: 700, flexShrink: 0, marginTop: '10px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>{i + 1}</span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <textarea
+                    value={step.body}
+                    onChange={(e) => updateInstruction(i, 'body', e.target.value)}
+                    placeholder="Describe this step..."
+                    style={{ ...inputStyle, resize: 'vertical', minHeight: '72px', width: '100%' }}
+                  />
+                  <input
+                    value={step.group_label}
+                    onChange={(e) => updateInstruction(i, 'group_label', e.target.value)}
+                    placeholder="Section label (optional)"
+                    style={{ ...inputStyle, fontSize: '13px' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => moveInstruction(i, -1)}
+                    disabled={i === 0}
+                    style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: i === 0 ? 'default' : 'pointer', opacity: i === 0 ? 0.3 : 1, padding: '2px 6px', fontSize: '12px' }}
+                  >↑</button>
+                  <button
+                    type="button"
+                    onClick={() => moveInstruction(i, 1)}
+                    disabled={i === instructions.length - 1}
+                    style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: i === instructions.length - 1 ? 'default' : 'pointer', opacity: i === instructions.length - 1 ? 0.3 : 1, padding: '2px 6px', fontSize: '12px' }}
+                  >↓</button>
+                  <button
+                    type="button"
+                    onClick={() => removeInstruction(i)}
+                    style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '2px' }}
+                  >×</button>
+                </div>
+              </div>
+            ))}
+            <Button type="button" variant="ghost" onClick={addInstruction} style={{ alignSelf: 'flex-start' }}>
+              + Add step
+            </Button>
+          </div>
+        </section>
+
+        {/* Tags */}
+        <section>
+          <h2 style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '16px' }}>Tags</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+            {tags.map((t) => (
+              <span key={t} style={{ fontSize: '12px', background: 'var(--color-border)', color: 'var(--color-text)', padding: '4px 10px', borderRadius: '999px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {t}
+                <button
+                  type="button"
+                  onClick={() => removeTag(t)}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: '14px' }}
+                >×</button>
+              </span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+              placeholder="Add a tag..."
+              style={{ ...inputStyle, flex: 1, maxWidth: '200px' }}
+            />
+            <Button type="button" variant="ghost" onClick={addTag}>Add</Button>
+          </div>
+        </section>
+
+        {error && <p style={{ fontSize: '13px', color: '#dc2626', margin: 0 }}>{error}</p>}
+        {saved && <p style={{ fontSize: '13px', color: '#16a34a', margin: 0 }}>Saved successfully!</p>}
+
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <Button type="submit" loading={isPending}>Save Changes</Button>
+          <Button type="button" variant="ghost" onClick={() => navigate(`/recipes/${id}`)}>Cancel</Button>
+        </div>
+      </form>
+    </div>
+  )
+}

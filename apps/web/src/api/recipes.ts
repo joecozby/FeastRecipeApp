@@ -91,7 +91,7 @@ export function useCreateRecipe() {
 export function useUpdateRecipe(id: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: Partial<RecipeSummary>) =>
+    mutationFn: (data: Partial<RecipeDetail>) =>
       client.patch(`/recipes/${id}`, data).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recipes', id] })
