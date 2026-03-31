@@ -33,13 +33,31 @@ router.get(
     let scoreExpr = '0'
 
     if (q && q.length > 0) {
+      // Build a prefix tsquery so partial input like "Ita" matches "Italian".
+      // Each word except the last is matched exactly; the last gets :* for prefix matching.
+      // Words are sanitized to alphanumeric to avoid tsquery syntax errors.
+      const words = q.trim().split(/\s+/).map(w => w.replace(/[^a-zA-Z0-9]/g, '')).filter(Boolean)
+      const prefixQuery = words.length > 0
+        ? words.map((w, i) => i === words.length - 1 ? `${w}:*` : w).join(' & ')
+        : null
+
       params.push(q)
       const qi = params.length
-      // FTS + trgm combined score: ts_rank * 2 + similarity
-      scoreExpr = `(ts_rank(r.fts_vector, plainto_tsquery('english', $${qi})) * 2 + similarity(r.title, $${qi}))`
-      conditions.push(
-        `(r.fts_vector @@ plainto_tsquery('english', $${qi}) OR similarity(r.title, $${qi}) > 0.1)`
-      )
+
+      if (prefixQuery) {
+        params.push(prefixQuery)
+        const pqi = params.length
+        // Score: prefix FTS rank + word_similarity (handles partial substring matches)
+        scoreExpr = `(ts_rank(r.fts_vector, to_tsquery('english', $${pqi})) * 2 + word_similarity($${qi}, r.title))`
+        conditions.push(
+          `(r.fts_vector @@ to_tsquery('english', $${pqi})
+            OR word_similarity($${qi}, r.title) > 0.1
+            OR r.title ILIKE '%' || $${qi} || '%')`
+        )
+      } else {
+        scoreExpr = `word_similarity($${qi}, r.title)`
+        conditions.push(`(word_similarity($${qi}, r.title) > 0.1 OR r.title ILIKE '%' || $${qi} || '%')`)
+      }
     }
 
     if (cuisine) {
