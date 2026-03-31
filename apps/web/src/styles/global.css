@@ -1,0 +1,59 @@
+/* Design tokens */
+:root {
+  --color-bg:             #FAFAF8;
+  --color-surface:        #FFFFFF;
+  --color-border:         #EBEBEB;
+  --color-text:           #1A1A1A;
+  --color-text-muted:     #888888;
+  --color-primary:        #E8622A;
+  --color-primary-hover:  #D4531C;
+  --color-primary-light:  #FEF0E9;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+
+  --nav-width:    240px;
+  --content-max:  1100px;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+/* Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
