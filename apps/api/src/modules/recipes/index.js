@@ -283,14 +283,17 @@ router.put(
       // --- Tags ---
       await client.query(`DELETE FROM recipe_tags WHERE recipe_id = $1`, [recipeId])
       for (const tagNameOrId of tags) {
-        // Accept either tag id (UUID) or name string
-        let tagId = tagNameOrId
-        if (!/^[0-9a-f-]{36}$/.test(tagNameOrId)) {
+        // Accept tag id (UUID), name string, or { name } object
+        const raw = typeof tagNameOrId === 'object' && tagNameOrId !== null
+          ? tagNameOrId.name
+          : tagNameOrId
+        let tagId = raw
+        if (!/^[0-9a-f-]{36}$/.test(String(raw))) {
           const { rows: [tag] } = await client.query(
             `INSERT INTO tags (name) VALUES (lower($1))
              ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
              RETURNING id`,
-            [tagNameOrId]
+            [String(raw)]
           )
           tagId = tag.id
         }

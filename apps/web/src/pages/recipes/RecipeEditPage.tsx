@@ -103,7 +103,7 @@ export default function RecipeEditPage() {
             group_label: s.group_label.trim() || null,
             step_number: idx + 1,
           })),
-        tags: tags.map((name) => ({ name })),
+        tags: tags,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
