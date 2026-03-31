@@ -1,6 +1,7 @@
 // Express app setup — routes will be mounted as modules are built
 import express from 'express'
 import cors from 'cors'
+import logger from './config/logger.js'
 
 const app = express()
 
@@ -18,6 +19,12 @@ app.use(express.json())
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', app: 'feast-api' })
+})
+
+// Minimal request logger — expanded middleware added in Step 5
+app.use((req, _res, next) => {
+  logger.debug(`${req.method} ${req.path}`)
+  next()
 })
 
 export default app
