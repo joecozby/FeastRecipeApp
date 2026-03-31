@@ -73,7 +73,20 @@ async function saveRecipe(userId, parsed, sourceUrl, rawImportData) {
     }
 
     // --- Tags (upsert by name) ---
-    for (const tagName of parsed.tags ?? []) {
+    for (const rawTag of parsed.tags ?? []) {
+      if (!rawTag) continue
+      // Normalize: handle plain string, {name:...} object, or '{"name":"..."}' JSON string
+      let tagName
+      if (typeof rawTag === 'object' && rawTag !== null) {
+        tagName = rawTag.name
+      } else {
+        const s = String(rawTag).trim()
+        if (s.startsWith('{')) {
+          try { tagName = JSON.parse(s).name } catch { tagName = s }
+        } else {
+          tagName = s
+        }
+      }
       if (!tagName) continue
       const { rows: [tag] } = await client.query(
         `INSERT INTO tags (name) VALUES (lower($1))
