@@ -113,21 +113,42 @@ Rules:
 // Real Claude API call
 // ---------------------------------------------------------------------------
 
+const RETRY_DELAYS_MS = [5000, 10000, 20000]
+
+function isOverloaded(err) {
+  // Anthropic SDK throws APIStatusError with status 529 when overloaded
+  return err?.status === 529 || err?.message?.includes('overloaded') || err?.message?.includes('529')
+}
+
 async function callClaude(text) {
   const { default: Anthropic } = await import('@anthropic-ai/sdk')
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: `Parse this recipe:\n\n${text}` }],
-  })
+  let lastErr
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const message = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: `Parse this recipe:\n\n${text}` }],
+      })
 
-  const content = message.content[0]
-  if (content.type !== 'text') throw new Error('Unexpected response type from Claude')
-
-  return JSON.parse(content.text)
+      const content = message.content[0]
+      if (content.type !== 'text') throw new Error('Unexpected response type from Claude')
+      return JSON.parse(content.text)
+    } catch (err) {
+      lastErr = err
+      if (isOverloaded(err) && attempt < RETRY_DELAYS_MS.length) {
+        const delay = RETRY_DELAYS_MS[attempt]
+        logger.warn(`Claude overloaded — retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      throw err
+    }
+  }
+  throw lastErr
 }
 
 // ---------------------------------------------------------------------------
