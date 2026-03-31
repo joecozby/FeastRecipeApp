@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useRecipes } from '../api/recipes'
+import { useRecipes, RecipeSummary } from '../api/recipes'
 import { useAuthStore } from '../store/authStore'
 import { RecipeCard } from '../components/ui/RecipeCard'
 import { Button } from '../components/ui/Button'
@@ -77,7 +77,7 @@ export default function HomePage() {
           <EmptyState icon="🍽" title="No published recipes yet" description="Import and publish recipes to see them here." action={<Button onClick={() => navigate('/import')}>Import a recipe</Button>} />
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' }}>
-            {recentRecipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}
+            {recentRecipes.map((recipe: RecipeSummary) => <RecipeCard key={recipe.id} recipe={recipe} />)}
           </div>
         )}
       </section>

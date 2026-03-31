@@ -1,6 +1,6 @@
 import { useState, FormEvent, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useRecipe, useUpdateRecipe, useSaveRecipeContent } from '../../api/recipes'
+import { useRecipe, useUpdateRecipe, useSaveRecipeContent, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea } from '../../components/ui/Input'
 
@@ -58,19 +58,19 @@ export default function RecipeEditPage() {
     setCookTime(recipe.cook_time_mins ? String(recipe.cook_time_mins) : '')
     setServings(recipe.base_servings ? String(recipe.base_servings) : '')
     setIngredients(
-      (recipe.ingredients ?? []).map((i) => ({
+      (recipe.ingredients ?? []).map((i: RecipeIngredient) => ({
         raw_text: i.raw_text,
         group_label: i.group_label ?? '',
         is_optional: i.is_optional ?? false,
       }))
     )
     setInstructions(
-      (recipe.instructions ?? []).map((s) => ({
+      (recipe.instructions ?? []).map((s: Instruction) => ({
         body: s.body,
         group_label: s.group_label ?? '',
       }))
     )
-    setTags((recipe.tags ?? []).map((t) => t.name))
+    setTags((recipe.tags ?? []).map((t: Tag) => t.name))
   }, [recipe])
 
   async function handleSave(e: FormEvent) {

@@ -4,10 +4,10 @@ import { RecipeCard } from '../components/ui/RecipeCard'
 import { useFilterState } from '../hooks/useFilterState'
 
 export default function SearchPage() {
-  const [q, setQ]             = useFilterState('q', '')
-  const [cuisine, setCuisine] = useFilterState('cuisine', '')
+  const [q, setQ]             = useFilterState<string>('q', '')
+  const [cuisine, setCuisine] = useFilterState<string>('cuisine', '')
   const [difficulty, setDifficulty] = useFilterState<'' | 'easy' | 'medium' | 'hard'>('difficulty', '')
-  const [tags, setTags]       = useFilterState('tags', '')
+  const [tags, setTags]       = useFilterState<string>('tags', '')
 
   const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useSearch({
     q: q || undefined,
