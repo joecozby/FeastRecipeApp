@@ -164,7 +164,10 @@ router.get('/', asyncHandler(async (req, res) => {
       [listId]
     ),
     pool.query(
-      `SELECT * FROM grocery_list_items WHERE grocery_list_id = $1 ORDER BY display_order`,
+      `SELECT id, grocery_list_id, ingredient_id, display_name,
+              quantity::float AS quantity, unit, is_checked, notes,
+              display_order, source_recipe_ids, created_at, updated_at
+       FROM grocery_list_items WHERE grocery_list_id = $1 ORDER BY display_order`,
       [listId]
     ),
   ])

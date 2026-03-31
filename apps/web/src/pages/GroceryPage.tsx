@@ -3,9 +3,11 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 
-function formatQty(quantity: number | null, unit: string | null): string {
-  if (quantity === null) return ''
-  const qty = quantity === Math.round(quantity) ? String(Math.round(quantity)) : String(parseFloat(quantity.toFixed(2)))
+function formatQty(quantity: number | string | null, unit: string | null): string {
+  if (quantity === null || quantity === undefined) return ''
+  const num = Number(quantity)
+  if (isNaN(num)) return String(quantity)
+  const qty = num === Math.round(num) ? String(Math.round(num)) : String(parseFloat(num.toFixed(2)))
   return unit ? `${qty} ${unit}` : qty
 }
 
