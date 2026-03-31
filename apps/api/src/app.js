@@ -1,7 +1,7 @@
-// Express app setup — routes will be mounted as modules are built
 import express from 'express'
 import cors from 'cors'
 import logger from './config/logger.js'
+import { errorHandler } from './middleware/errorHandler.js'
 
 const app = express()
 
@@ -17,14 +17,20 @@ app.use(cors({
 
 app.use(express.json())
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', app: 'feast-api' })
-})
-
-// Minimal request logger — expanded middleware added in Step 5
+// Request logger
 app.use((req, _res, next) => {
   logger.debug(`${req.method} ${req.path}`)
   next()
 })
+
+// Health check — no auth required
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', app: 'feast-api' })
+})
+
+// --- Module routes mounted here as steps are completed ---
+
+// Global error handler — must be last
+app.use(errorHandler)
 
 export default app
