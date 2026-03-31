@@ -6,11 +6,65 @@ import { useAddRecipeToGrocery } from '../../api/grocery'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 
+function formatQty(n: number): string {
+  if (n === Math.round(n)) return String(Math.round(n))
+  return String(parseFloat(n.toFixed(1)))
+}
+
 function scaleQty(qty: number | null, scale: number): string {
   if (qty === null) return ''
   const scaled = qty * scale
   if (scaled === Math.round(scaled)) return String(Math.round(scaled))
   return String(parseFloat(scaled.toFixed(2)))
+}
+
+// Returns converted {quantity, unit} or null if unit is unrecognised / already in target system
+function convertUnit(
+  quantity: number | null,
+  unit: string | null,
+  target: 'metric' | 'us',
+): { quantity: string; unit: string } | null {
+  if (!quantity || !unit) return null
+  const u = unit.toLowerCase().trim()
+
+  if (target === 'metric') {
+    const vol: Record<string, number> = {
+      teaspoon: 5, tsp: 5,
+      tablespoon: 15, tbsp: 15,
+      cup: 240, cups: 240,
+      'fluid ounce': 29.57, 'fl oz': 29.57,
+    }
+    const wt: Record<string, number> = {
+      ounce: 28.35, oz: 28.35,
+      pound: 453.6, lb: 453.6, lbs: 453.6,
+    }
+    if (vol[u] !== undefined) {
+      const ml = quantity * vol[u]
+      return ml >= 1000 ? { quantity: formatQty(ml / 1000), unit: 'L' } : { quantity: formatQty(ml), unit: 'ml' }
+    }
+    if (wt[u] !== undefined) {
+      const g = quantity * wt[u]
+      return g >= 1000 ? { quantity: formatQty(g / 1000), unit: 'kg' } : { quantity: formatQty(g), unit: 'g' }
+    }
+    return null
+  }
+
+  // target === 'us'
+  if (u === 'ml') {
+    if (quantity < 15) return { quantity: formatQty(quantity / 5), unit: 'tsp' }
+    if (quantity < 60) return { quantity: formatQty(quantity / 15), unit: 'tbsp' }
+    return { quantity: formatQty(quantity / 240), unit: 'cup' }
+  }
+  if (u === 'l' || u === 'liter' || u === 'litre') {
+    return { quantity: formatQty((quantity * 1000) / 240), unit: 'cup' }
+  }
+  if (u === 'g' || u === 'gram' || u === 'grams') {
+    return quantity < 454 ? { quantity: formatQty(quantity / 28.35), unit: 'oz' } : { quantity: formatQty(quantity / 453.6), unit: 'lb' }
+  }
+  if (u === 'kg' || u === 'kilogram' || u === 'kilograms') {
+    return { quantity: formatQty(quantity * 2.205), unit: 'lb' }
+  }
+  return null
 }
 
 function groupBy<T>(items: T[], key: (item: T) => string | null): [string | null, T[]][] {
@@ -48,6 +102,7 @@ export default function RecipeDetailPage() {
   const { data: cookbooks } = useCookbooks()
 
   const [servings, setServings] = useState<number | null>(null)
+  const [unitSystem, setUnitSystem] = useState<'original' | 'metric' | 'us'>('original')
   const [cookbookModal, setCookbookModal] = useState(false)
   const [groceryMsg, setGroceryMsg] = useState('')
 
@@ -193,7 +248,22 @@ export default function RecipeDetailPage() {
       {/* Ingredients + Instructions grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '40px', alignItems: 'start' }}>
         <div>
-          <h2 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Ingredients</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 700 }}>Ingredients</h2>
+            <div style={{ display: 'flex', background: 'var(--color-border)', borderRadius: 'var(--radius-sm)', padding: '3px', gap: '2px' }}>
+              {(['original', 'metric', 'us'] as const).map((sys) => (
+                <button key={sys} onClick={() => setUnitSystem(sys)} style={{
+                  padding: '3px 10px', borderRadius: 'calc(var(--radius-sm) - 2px)', border: 'none',
+                  fontSize: '11px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                  background: unitSystem === sys ? 'var(--color-surface)' : 'transparent',
+                  color: unitSystem === sys ? 'var(--color-text)' : 'var(--color-text-muted)',
+                  boxShadow: unitSystem === sys ? 'var(--shadow-sm)' : 'none',
+                }}>
+                  {sys === 'original' ? 'Original' : sys === 'metric' ? 'Metric' : 'US'}
+                </button>
+              ))}
+            </div>
+          </div>
           {ingredientGroups.map(([group, items]) => (
             <div key={group ?? '_'} style={{ marginBottom: '20px' }}>
               {group && (
@@ -203,8 +273,11 @@ export default function RecipeDetailPage() {
               )}
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {items.map((ing: RecipeIngredient) => {
-                  const qtyStr = scaleQty(ing.quantity, scale)
-                  const parts = [qtyStr, ing.unit, ing.canonical_name ?? ing.raw_text, ing.preparation].filter(Boolean)
+                  const scaledQty = ing.quantity !== null ? ing.quantity * scale : null
+                  const converted = unitSystem !== 'original' ? convertUnit(scaledQty, ing.unit, unitSystem) : null
+                  const qtyStr  = converted ? converted.quantity : scaleQty(ing.quantity, scale)
+                  const unitStr = converted ? converted.unit     : ing.unit
+                  const parts = [qtyStr, unitStr, ing.canonical_name ?? ing.raw_text, ing.preparation].filter(Boolean)
                   return (
                     <li key={ing.id} style={{ fontSize: '14px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                       <span style={{ color: 'var(--color-primary)', marginTop: '2px', flexShrink: 0 }}>•</span>
