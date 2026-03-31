@@ -272,8 +272,9 @@ export default function RecipeDetailPage() {
               { label: 'Sodium',   value: nutrition.per_serving.sodium,   unit: 'mg' },
             ] as const).map(({ label, value, unit }) => (
               <div key={label} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '12px', textAlign: 'center' }}>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>{value}</p>
-                <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>{unit}</p>
+                <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>
+                  {value}<span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '2px' }}>{unit}</span>
+                </p>
                 <p style={{ fontSize: '11px', fontWeight: 500, marginTop: '2px' }}>{label}</p>
               </div>
             ))}
