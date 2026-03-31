@@ -189,6 +189,12 @@ router.patch(
        RETURNING *`,
       params
     )
+
+    // Recalculate nutrition whenever base_servings changes (per-serving values depend on it)
+    if (req.body.base_servings !== undefined) {
+      enqueueNutrition(req.params.id).catch(err => logger.warn(`Failed to enqueue nutrition: ${err.message}`))
+    }
+
     res.json(recipe)
   })
 )
