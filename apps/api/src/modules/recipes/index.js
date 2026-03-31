@@ -5,6 +5,8 @@ import { validate } from '../../middleware/validate.js'
 import { requireAuth } from '../../middleware/auth.js'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { normalizeIngredient } from '../../services/ingredientNormalizer.js'
+import logger from '../../config/logger.js'
+import { enqueueNutrition } from '../../workers/nutritionWorker.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -318,7 +320,26 @@ router.put(
     }
 
     const recipe = await getRecipeWithContent(recipeId, req.user.sub)
+    enqueueNutrition(recipeId).catch(err => logger.warn(`Failed to enqueue nutrition: ${err.message}`))
     res.json(recipe)
+  })
+)
+
+// ---------------------------------------------------------------------------
+// GET /api/recipes/:id/nutrition
+// ---------------------------------------------------------------------------
+router.get(
+  '/:id/nutrition',
+  [param('id').isUUID(), validate],
+  asyncHandler(async (req, res) => {
+    await getRecipeOrThrow(req.params.id, req.user.sub)
+    const { rows: [snapshot] } = await pool.query(
+      `SELECT per_serving, computed_at, is_estimated
+       FROM nutrition_snapshots WHERE recipe_id = $1`,
+      [req.params.id]
+    )
+    if (!snapshot) return res.json(null)
+    res.json(snapshot)
   })
 )
 

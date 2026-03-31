@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validate.js'
 import { requireAuth } from '../../middleware/auth.js'
 import { asyncHandler } from '../../middleware/errorHandler.js'
 import { normalizeIngredient } from '../../services/ingredientNormalizer.js'
+import { enqueueNutrition } from '../../workers/nutritionWorker.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -329,10 +330,12 @@ When the user asks you to create a recipe, ALWAYS use the create_recipe tool to 
             if (block.name === 'create_recipe') {
               const id = await executeCreateRecipe(block.input, userId)
               createdRecipeId = id
+              enqueueNutrition(id).catch(() => {})
               result = { success: true, recipe_id: id }
             } else if (block.name === 'edit_recipe') {
               const id = await executeEditRecipe(block.input, userId)
               updatedRecipeId = id
+              enqueueNutrition(id).catch(() => {})
               result = { success: true, recipe_id: id }
             } else {
               result = { error: 'Unknown tool' }

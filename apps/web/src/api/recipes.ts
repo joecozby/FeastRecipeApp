@@ -141,6 +141,27 @@ export function useImportRecipe() {
   })
 }
 
+export interface NutritionSnapshot {
+  per_serving: {
+    calories: number
+    protein: number
+    fat: number
+    carbs: number
+    fiber: number
+    sodium: number
+  }
+  computed_at: string
+  is_estimated: boolean
+}
+
+export function useRecipeNutrition(id: string) {
+  return useQuery({
+    queryKey: ['nutrition', id],
+    queryFn: () => client.get(`/recipes/${id}/nutrition`).then((r) => r.data as NutritionSnapshot | null),
+    enabled: !!id,
+  })
+}
+
 export function useImportJobStatus(jobId: string | null) {
   return useQuery({
     queryKey: ['import-job', jobId],

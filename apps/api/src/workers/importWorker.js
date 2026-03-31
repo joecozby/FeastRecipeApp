@@ -5,6 +5,7 @@ import logger from '../config/logger.js'
 import { scrapeUrl, scrapeInstagram } from '../services/scraper.js'
 import { parseRecipeText } from '../services/aiParser.js'
 import { normalizeIngredient } from '../services/ingredientNormalizer.js'
+import { enqueueNutrition } from './nutritionWorker.js'
 
 // ---------------------------------------------------------------------------
 // Pipeline step: save parsed + normalized recipe to DB
@@ -222,6 +223,7 @@ export function startImportWorker() {
       )
 
       logger.info('Import job complete', { jobId, recipeId })
+      enqueueNutrition(recipeId).catch(err => logger.warn(`Failed to enqueue nutrition: ${err.message}`))
       return { recipeId }
     },
     {

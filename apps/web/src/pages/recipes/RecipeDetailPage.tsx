@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useRecipe, usePublishRecipe, useDeleteRecipe, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
+import { useRecipe, usePublishRecipe, useDeleteRecipe, useRecipeNutrition, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
 import { useCookbooks, useAddRecipeToCookbook } from '../../api/cookbooks'
 import { useAddRecipeToGrocery } from '../../api/grocery'
 import { Button } from '../../components/ui/Button'
@@ -40,6 +40,7 @@ export default function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: recipe, isLoading } = useRecipe(id!)
+  const { data: nutrition } = useRecipeNutrition(id!)
   const publishMutation = usePublishRecipe(id!)
   const deleteMutation = useDeleteRecipe()
   const addToGrocery = useAddRecipeToGrocery()
@@ -249,6 +250,36 @@ export default function RecipeDetailPage() {
       </div>
 
       <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '32px 0' }} />
+
+      {/* Nutrition panel */}
+      {nutrition && (
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 700 }}>Nutrition per serving</h2>
+            {nutrition.is_estimated && (
+              <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>
+                ESTIMATED
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px' }}>
+            {([
+              { label: 'Calories', value: nutrition.per_serving.calories, unit: 'kcal' },
+              { label: 'Protein',  value: nutrition.per_serving.protein,  unit: 'g' },
+              { label: 'Fat',      value: nutrition.per_serving.fat,      unit: 'g' },
+              { label: 'Carbs',    value: nutrition.per_serving.carbs,    unit: 'g' },
+              { label: 'Fiber',    value: nutrition.per_serving.fiber,    unit: 'g' },
+              { label: 'Sodium',   value: nutrition.per_serving.sodium,   unit: 'mg' },
+            ] as const).map(({ label, value, unit }) => (
+              <div key={label} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '12px', textAlign: 'center' }}>
+                <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>{value}</p>
+                <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>{unit}</p>
+                <p style={{ fontSize: '11px', fontWeight: 500, marginTop: '2px' }}>{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bottom actions */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
