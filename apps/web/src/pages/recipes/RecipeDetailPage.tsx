@@ -57,7 +57,7 @@ export default function RecipeDetailPage() {
     return <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Recipe not found.</div>
   }
 
-  const base = recipe.base_servings ?? 1
+  const base = Math.round(recipe.base_servings ?? 1)
   const currentServings = servings ?? base
   const scale = base > 0 ? currentServings / base : 1
   const totalMins = (recipe.prep_time_mins ?? 0) + (recipe.cook_time_mins ?? 0)
@@ -172,12 +172,12 @@ export default function RecipeDetailPage() {
           <span style={{ fontSize: '14px', fontWeight: 600 }}>Servings</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
-              onClick={() => setServings(Math.max(1, currentServings - 1))}
+              onClick={() => setServings(Math.max(1, Math.round(currentServings) - 1))}
               style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)' }}
             >−</button>
             <span style={{ fontSize: '16px', fontWeight: 600, minWidth: '24px', textAlign: 'center' }}>{currentServings}</span>
             <button
-              onClick={() => setServings(currentServings + 1)}
+              onClick={() => setServings(Math.round(currentServings) + 1)}
               style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)' }}
             >+</button>
           </div>
