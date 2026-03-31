@@ -11,6 +11,7 @@
     "db:seed": "node src/db/seed.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.3",
     "@feast/shared": "*",
     "dotenv": "^16.4.5",
     "bcryptjs": "^2.4.3",
