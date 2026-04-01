@@ -159,20 +159,11 @@ export interface NutritionSnapshot {
   is_estimated: boolean
 }
 
-export function useRecipeNutrition(id: string, recipeUpdatedAt?: string) {
+export function useRecipeNutrition(id: string) {
   return useQuery({
     queryKey: ['nutrition', id],
     queryFn: () => client.get(`/recipes/${id}/nutrition`).then((r) => r.data as NutritionSnapshot | null),
     enabled: !!id,
-    staleTime: 0,
-    refetchInterval: (query) => {
-      const data = query.state.data as NutritionSnapshot | null | undefined
-      // No snapshot yet — poll until one appears
-      if (!data) return 5000
-      // Snapshot is older than the last recipe edit — poll until worker catches up
-      if (recipeUpdatedAt && data.computed_at < recipeUpdatedAt) return 5000
-      return false
-    },
   })
 }
 

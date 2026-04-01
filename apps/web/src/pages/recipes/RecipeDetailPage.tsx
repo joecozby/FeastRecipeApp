@@ -94,7 +94,7 @@ export default function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: recipe, isLoading } = useRecipe(id!)
-  const { data: nutrition, isFetching: nutritionFetching } = useRecipeNutrition(id!, recipe?.updated_at)
+  const { data: nutrition } = useRecipeNutrition(id!)
   const publishMutation = usePublishRecipe(id!)
   const deleteMutation = useDeleteRecipe()
   const addToGrocery = useAddRecipeToGrocery()
@@ -329,14 +329,9 @@ export default function RecipeDetailPage() {
         <div style={{ marginBottom: '32px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700 }}>Nutrition per serving</h2>
-            {nutrition.is_estimated && !nutritionFetching && (
+            {nutrition.is_estimated && (
               <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>
                 ESTIMATED
-              </span>
-            )}
-            {nutritionFetching && recipe?.updated_at && nutrition.computed_at < recipe.updated_at && (
-              <span style={{ fontSize: '11px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>
-                RECALCULATING…
               </span>
             )}
           </div>

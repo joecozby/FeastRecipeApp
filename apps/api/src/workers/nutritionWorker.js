@@ -76,13 +76,14 @@ export function startNutritionWorker() {
       }
 
       await pool.query(
-        `INSERT INTO nutrition_snapshots (recipe_id, per_serving, computed_at, is_estimated)
-         VALUES ($1, $2, now(), true)
+        `INSERT INTO nutrition_snapshots (recipe_id, total_nutrients, per_serving, computed_at, is_estimated)
+         VALUES ($1, $2, $3, now(), true)
          ON CONFLICT (recipe_id) DO UPDATE SET
-           per_serving = EXCLUDED.per_serving,
-           computed_at = EXCLUDED.computed_at,
-           is_estimated = true`,
-        [recipe_id, JSON.stringify(perServing)]
+           total_nutrients = EXCLUDED.total_nutrients,
+           per_serving     = EXCLUDED.per_serving,
+           computed_at     = EXCLUDED.computed_at,
+           is_estimated    = true`,
+        [recipe_id, JSON.stringify(totals), JSON.stringify(perServing)]
       )
 
       logger.info(`Nutrition saved for ${recipe_id}: ${matched}/${ingredients.length} ingredients resolved`)

@@ -190,9 +190,25 @@ router.patch(
       params
     )
 
-    // Recalculate nutrition whenever base_servings changes (per-serving values depend on it)
+    // When base_servings changes, recompute per_serving instantly from cached totals.
+    // No USDA API call needed — totals don't change, only the divisor does.
     if (req.body.base_servings !== undefined) {
-      enqueueNutrition(req.params.id).catch(err => logger.warn(`Failed to enqueue nutrition: ${err.message}`))
+      const newBase = Math.max(1, req.body.base_servings || 1)
+      const { rows: [snap] } = await pool.query(
+        `SELECT total_nutrients FROM nutrition_snapshots WHERE recipe_id = $1`,
+        [req.params.id]
+      )
+      if (snap?.total_nutrients) {
+        const perServing = {}
+        for (const [key, val] of Object.entries(snap.total_nutrients)) {
+          perServing[key] = Math.round(val / newBase)
+        }
+        await pool.query(
+          `UPDATE nutrition_snapshots SET per_serving = $1, computed_at = now() WHERE recipe_id = $2`,
+          [JSON.stringify(perServing), req.params.id]
+        )
+        logger.info(`Nutrition per-serving updated synchronously for recipe ${req.params.id} (base_servings=${newBase})`)
+      }
     }
 
     res.json(recipe)
@@ -338,14 +354,27 @@ router.get(
   '/:id/nutrition',
   [param('id').isUUID(), validate],
   asyncHandler(async (req, res) => {
-    await getRecipeOrThrow(req.params.id, req.user.sub)
+    const recipe = await getRecipeOrThrow(req.params.id, req.user.sub)
     const { rows: [snapshot] } = await pool.query(
-      `SELECT per_serving, computed_at, is_estimated
+      `SELECT total_nutrients, per_serving, computed_at, is_estimated
        FROM nutrition_snapshots WHERE recipe_id = $1`,
       [req.params.id]
     )
     if (!snapshot) return res.json(null)
-    res.json(snapshot)
+
+    // Always compute per_serving fresh from total_nutrients ÷ current base_servings.
+    // This ensures per-serving is correct even if base_servings was updated after
+    // the last nutrition calculation.
+    let perServing = snapshot.per_serving
+    if (snapshot.total_nutrients) {
+      const base = Math.max(1, recipe.base_servings || 1)
+      perServing = {}
+      for (const [key, val] of Object.entries(snapshot.total_nutrients)) {
+        perServing[key] = Math.round(val / base)
+      }
+    }
+
+    res.json({ per_serving: perServing, computed_at: snapshot.computed_at, is_estimated: snapshot.is_estimated })
   })
 )
 
