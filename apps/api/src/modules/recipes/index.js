@@ -50,9 +50,11 @@ async function getRecipeWithContent(id, userId) {
 
   const { rows: [recipe] } = await pool.query(
     `SELECT r.*,
-            p.display_name AS owner_name
+            p.display_name AS owner_name,
+            m.url AS cover_url
      FROM recipes r
      LEFT JOIN profiles p ON p.user_id = r.owner_id
+     LEFT JOIN media_assets m ON m.id = r.cover_media_id
      WHERE r.id = $1`,
     [id]
   )
