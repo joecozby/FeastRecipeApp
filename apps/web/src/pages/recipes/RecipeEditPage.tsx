@@ -46,7 +46,6 @@ export default function RecipeEditPage() {
   const [tags, setTags] = useState<string[]>([])
 
   const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (!recipe) return
@@ -105,8 +104,7 @@ export default function RecipeEditPage() {
           })),
         tags: tags,
       })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
+      navigate(`/recipes/${id}`)
     } catch {
       setError('Save failed. Please try again.')
     }
@@ -316,7 +314,6 @@ export default function RecipeEditPage() {
         </section>
 
         {error && <p style={{ fontSize: '13px', color: '#dc2626', margin: 0 }}>{error}</p>}
-        {saved && <p style={{ fontSize: '13px', color: '#16a34a', margin: 0 }}>Saved successfully!</p>}
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <Button type="submit" loading={isPending}>Save Changes</Button>
