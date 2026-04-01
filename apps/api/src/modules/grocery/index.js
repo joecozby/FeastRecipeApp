@@ -9,11 +9,23 @@ const router = Router()
 router.use(requireAuth)
 
 // ---------------------------------------------------------------------------
-// Grocery list merge logic
+// Helper — build a stable ingredient_key for grouping across recipes
 // ---------------------------------------------------------------------------
 
-async function mergeGroceryList(groceryListId, client) {
-  // 1. Load all recipes in the list with their chosen servings
+function makeIngredientKey(ingredientId, unit, rawText) {
+  if (ingredientId) return `id:${ingredientId}:${unit ?? ''}`
+  return `raw:${(rawText || '').toLowerCase().trim()}`
+}
+
+// ---------------------------------------------------------------------------
+// Rebuild grocery items — stores ONE ROW PER (recipe × ingredient).
+// No quantities are merged in the DB; that happens at display time in the UI.
+// Checked state is preserved by ingredient_key so checking off "olive oil"
+// once survives recipe removals/re-adds.
+// ---------------------------------------------------------------------------
+
+async function rebuildGroceryItems(groceryListId, client) {
+  // 1. Load all recipes currently in the list
   const { rows: listRecipes } = await client.query(
     `SELECT glr.recipe_id, glr.servings AS chosen_servings, r.base_servings
      FROM grocery_list_recipes glr
@@ -22,20 +34,27 @@ async function mergeGroceryList(groceryListId, client) {
     [groceryListId]
   )
 
-  // 2. Load existing items to preserve is_checked state
+  // 2. Snapshot checked-by-ingredient_key before wiping items
   const { rows: existingItems } = await client.query(
-    `SELECT ingredient_id, is_checked FROM grocery_list_items WHERE grocery_list_id = $1`,
+    `SELECT ingredient_key, is_checked
+     FROM grocery_list_items WHERE grocery_list_id = $1`,
     [groceryListId]
   )
-  const checkedByIngredient = new Map()
+  const checkedByKey = new Map()
   for (const item of existingItems) {
-    if (item.ingredient_id && item.is_checked) {
-      checkedByIngredient.set(item.ingredient_id, true)
+    if (item.ingredient_key && item.is_checked) {
+      checkedByKey.set(item.ingredient_key, true)
     }
   }
 
-  // 3. Load + scale all ingredients across all recipes
-  const scaledIngredients = []
+  // 3. Delete all existing items
+  await client.query(
+    `DELETE FROM grocery_list_items WHERE grocery_list_id = $1`,
+    [groceryListId]
+  )
+
+  // 4. Insert one row per (recipe × ingredient), scaled to chosen servings
+  let order = 0
   for (const lr of listRecipes) {
     const scale = lr.base_servings
       ? (lr.chosen_servings ?? lr.base_servings) / lr.base_servings
@@ -46,81 +65,39 @@ async function mergeGroceryList(groceryListId, client) {
               ri.display_order, i.canonical_name
        FROM recipe_ingredients ri
        LEFT JOIN ingredients i ON i.id = ri.ingredient_id
-       WHERE ri.recipe_id = $1`,
+       WHERE ri.recipe_id = $1
+       ORDER BY ri.display_order`,
       [lr.recipe_id]
     )
 
     for (const ing of ings) {
-      scaledIngredients.push({
-        ingredient_id: ing.ingredient_id,
-        raw_text: ing.raw_text,
-        display_name: ing.canonical_name || ing.raw_text,
-        quantity: ing.quantity != null ? parseFloat(ing.quantity) * scale : null,
-        unit: ing.unit,
-        recipe_id: lr.recipe_id,
-      })
+      const scaledQty = ing.quantity != null
+        ? Math.round(parseFloat(ing.quantity) * scale * 10000) / 10000
+        : null
+      const displayName = ing.canonical_name || ing.raw_text
+      const ingredientKey = makeIngredientKey(ing.ingredient_id, ing.unit, ing.raw_text)
+      const isChecked = checkedByKey.get(ingredientKey) ?? false
+
+      await client.query(
+        `INSERT INTO grocery_list_items
+           (grocery_list_id, recipe_id, ingredient_id, display_name,
+            quantity, unit, is_checked, ingredient_key, display_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          groceryListId,
+          lr.recipe_id,
+          ing.ingredient_id ?? null,
+          displayName,
+          scaledQty,
+          ing.unit ?? null,
+          isChecked,
+          ingredientKey,
+          order++,
+        ]
+      )
     }
   }
 
-  // 4. Group and merge
-  // Key: ingredient_id+unit for resolved items, raw_text for unresolved
-  const mergedMap = new Map()
-
-  for (const ing of scaledIngredients) {
-    const key = ing.ingredient_id
-      ? `id:${ing.ingredient_id}:${ing.unit ?? ''}`
-      : `raw:${ing.raw_text.toLowerCase().trim()}`
-
-    if (mergedMap.has(key)) {
-      const entry = mergedMap.get(key)
-      if (ing.quantity != null && entry.quantity != null) {
-        entry.quantity += ing.quantity
-      } else {
-        entry.quantity = null // can't sum if either is null
-      }
-      entry.source_recipe_ids.push(ing.recipe_id)
-    } else {
-      mergedMap.set(key, {
-        ingredient_id: ing.ingredient_id,
-        display_name: ing.display_name,
-        quantity: ing.quantity,
-        unit: ing.unit,
-        source_recipe_ids: [ing.recipe_id],
-      })
-    }
-  }
-
-  // 5. Delete existing items and re-insert merged set in a transaction
-  await client.query(
-    `DELETE FROM grocery_list_items WHERE grocery_list_id = $1`,
-    [groceryListId]
-  )
-
-  let order = 0
-  for (const item of mergedMap.values()) {
-    const isChecked = item.ingredient_id
-      ? (checkedByIngredient.get(item.ingredient_id) ?? false)
-      : false
-
-    await client.query(
-      `INSERT INTO grocery_list_items
-         (grocery_list_id, ingredient_id, display_name, quantity, unit,
-          is_checked, source_recipe_ids, display_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [
-        groceryListId,
-        item.ingredient_id ?? null,
-        item.display_name,
-        item.quantity != null ? Math.round(item.quantity * 10000) / 10000 : null,
-        item.unit ?? null,
-        isChecked,
-        JSON.stringify(item.source_recipe_ids),
-        order++,
-      ]
-    )
-  }
-
-  // Bump list updated_at
   await client.query(
     `UPDATE grocery_lists SET updated_at = now() WHERE id = $1`,
     [groceryListId]
@@ -147,27 +124,32 @@ async function getOrCreateList(userId) {
 
 // ---------------------------------------------------------------------------
 // GET /api/grocery-lists
+// Returns the list with all recipes and all per-recipe items.
+// The frontend groups/merges for display depending on the view mode.
 // ---------------------------------------------------------------------------
 router.get('/', asyncHandler(async (req, res) => {
   const listId = await getOrCreateList(req.user.sub)
 
   const [{ rows: [list] }, { rows: recipes }, { rows: items }] = await Promise.all([
     pool.query(
-      `SELECT gl.id, gl.updated_at FROM grocery_lists gl WHERE gl.id = $1`,
+      `SELECT id, updated_at FROM grocery_lists WHERE id = $1`,
       [listId]
     ),
     pool.query(
       `SELECT glr.recipe_id, glr.servings, r.title, r.base_servings
        FROM grocery_list_recipes glr
        JOIN recipes r ON r.id = glr.recipe_id
-       WHERE glr.grocery_list_id = $1 AND r.deleted_at IS NULL`,
+       WHERE glr.grocery_list_id = $1 AND r.deleted_at IS NULL
+       ORDER BY glr.added_at`,
       [listId]
     ),
     pool.query(
-      `SELECT id, grocery_list_id, ingredient_id, display_name,
-              quantity::float AS quantity, unit, is_checked, notes,
-              display_order, source_recipe_ids, created_at, updated_at
-       FROM grocery_list_items WHERE grocery_list_id = $1 ORDER BY display_order`,
+      `SELECT id, recipe_id, ingredient_id, display_name,
+              quantity::float AS quantity, unit, is_checked,
+              notes, ingredient_key, display_order
+       FROM grocery_list_items
+       WHERE grocery_list_id = $1
+       ORDER BY display_order`,
       [listId]
     ),
   ])
@@ -176,7 +158,7 @@ router.get('/', asyncHandler(async (req, res) => {
 }))
 
 // ---------------------------------------------------------------------------
-// POST /api/grocery-lists/recipes  — add recipe, recalculate
+// POST /api/grocery-lists/recipes  — add recipe, rebuild items
 // ---------------------------------------------------------------------------
 router.post(
   '/recipes',
@@ -189,7 +171,6 @@ router.post(
     const listId = await getOrCreateList(req.user.sub)
     const { recipe_id, servings } = req.body
 
-    // Verify recipe exists and belongs to user
     const { rows: [recipe] } = await pool.query(
       `SELECT id, base_servings FROM recipes WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`,
       [recipe_id, req.user.sub]
@@ -207,7 +188,7 @@ router.post(
          ON CONFLICT (grocery_list_id, recipe_id) DO UPDATE SET servings = EXCLUDED.servings`,
         [listId, recipe_id, chosenServings]
       )
-      await mergeGroceryList(listId, client)
+      await rebuildGroceryItems(listId, client)
       await client.query('COMMIT')
     } catch (err) {
       await client.query('ROLLBACK')
@@ -221,7 +202,7 @@ router.post(
 )
 
 // ---------------------------------------------------------------------------
-// DELETE /api/grocery-lists/recipes/:id  — remove recipe, recalculate
+// DELETE /api/grocery-lists/recipes/:id  — remove recipe, rebuild items
 // ---------------------------------------------------------------------------
 router.delete(
   '/recipes/:id',
@@ -236,7 +217,7 @@ router.delete(
         `DELETE FROM grocery_list_recipes WHERE grocery_list_id = $1 AND recipe_id = $2`,
         [listId, req.params.id]
       )
-      await mergeGroceryList(listId, client)
+      await rebuildGroceryItems(listId, client)
       await client.query('COMMIT')
     } catch (err) {
       await client.query('ROLLBACK')
@@ -250,7 +231,7 @@ router.delete(
 )
 
 // ---------------------------------------------------------------------------
-// PATCH /api/grocery-lists/items/:id  — toggle is_checked, update notes
+// PATCH /api/grocery-lists/items/:id  — toggle a single item (by-recipe view)
 // ---------------------------------------------------------------------------
 router.patch(
   '/items/:id',
@@ -263,7 +244,6 @@ router.patch(
   asyncHandler(async (req, res) => {
     const listId = await getOrCreateList(req.user.sub)
 
-    // Verify item belongs to user's list
     const { rows: [item] } = await pool.query(
       `SELECT id FROM grocery_list_items WHERE id = $1 AND grocery_list_id = $2`,
       [req.params.id, listId]
@@ -289,6 +269,33 @@ router.patch(
       params
     )
     res.json(updated)
+  })
+)
+
+// ---------------------------------------------------------------------------
+// PATCH /api/grocery-lists/ingredient  — bulk check/uncheck by ingredient_key
+// Used by the Combined and By Category views to toggle all rows for an
+// ingredient across all recipes at once.
+// ---------------------------------------------------------------------------
+router.patch(
+  '/ingredient',
+  [
+    body('ingredient_key').notEmpty().withMessage('ingredient_key is required'),
+    body('is_checked').isBoolean().toBoolean(),
+    validate,
+  ],
+  asyncHandler(async (req, res) => {
+    const listId = await getOrCreateList(req.user.sub)
+    const { ingredient_key, is_checked } = req.body
+
+    await pool.query(
+      `UPDATE grocery_list_items
+       SET is_checked = $1, updated_at = now()
+       WHERE grocery_list_id = $2 AND ingredient_key = $3`,
+      [is_checked, listId, ingredient_key]
+    )
+
+    res.json({ ok: true })
   })
 )
 

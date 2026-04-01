@@ -1,16 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import client from './client'
 
+// One row per (recipe × ingredient) — quantities are NOT pre-merged in the DB.
+// The frontend merges them for display depending on the active view mode.
 export interface GroceryItem {
   id: string
+  recipe_id: string | null
   ingredient_id: string | null
+  ingredient_key: string
   display_name: string
   quantity: number | null
   unit: string | null
   is_checked: boolean
   notes: string | null
   display_order: number
-  source_recipe_ids: string[]
 }
 
 export interface GroceryRecipe {
@@ -52,6 +55,7 @@ export function useRemoveRecipeFromGrocery() {
   })
 }
 
+// Toggle a single item — used in By Recipe view
 export function useToggleGroceryItem() {
   const qc = useQueryClient()
   return useMutation({
@@ -65,6 +69,32 @@ export function useToggleGroceryItem() {
           ...prev,
           items: prev.items.map((item) =>
             item.id === id ? { ...item, is_checked } : item
+          ),
+        })
+      }
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['grocery'], ctx.prev)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['grocery'] }),
+  })
+}
+
+// Toggle all items that share the same ingredient_key — used in Combined and By Category views
+export function useToggleIngredientGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ ingredient_key, is_checked }: { ingredient_key: string; is_checked: boolean }) =>
+      client.patch('/grocery-lists/ingredient', { ingredient_key, is_checked }).then((r) => r.data),
+    onMutate: async ({ ingredient_key, is_checked }) => {
+      await qc.cancelQueries({ queryKey: ['grocery'] })
+      const prev = qc.getQueryData<GroceryList>(['grocery'])
+      if (prev) {
+        qc.setQueryData(['grocery'], {
+          ...prev,
+          items: prev.items.map((item) =>
+            item.ingredient_key === ingredient_key ? { ...item, is_checked } : item
           ),
         })
       }

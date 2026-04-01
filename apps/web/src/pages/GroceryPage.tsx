@@ -1,21 +1,282 @@
-import { useGroceryList, useRemoveRecipeFromGrocery, useToggleGroceryItem, GroceryItem, GroceryRecipe } from '../api/grocery'
+import { useState } from 'react'
+import {
+  useGroceryList,
+  useRemoveRecipeFromGrocery,
+  useToggleGroceryItem,
+  useToggleIngredientGroup,
+  GroceryItem,
+  GroceryRecipe,
+} from '../api/grocery'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 
-function formatQty(quantity: number | string | null, unit: string | null): string {
-  if (quantity === null || quantity === undefined) return ''
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type ViewMode = 'combined' | 'by-recipe' | 'by-category'
+
+// A logical ingredient entry shown to the user (may represent N raw rows)
+interface MergedEntry {
+  ingredient_key: string
+  display_name: string
+  quantity: number | null
+  unit: string | null
+  is_checked: boolean   // true when ALL source rows are checked
+  item_ids: string[]    // ids of every raw item in this group (for bulk toggle)
+  recipe_count: number  // how many recipes contribute
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatQty(quantity: number | null, unit: string | null): string {
+  if (quantity === null || quantity === undefined) return unit ?? ''
   const num = Number(quantity)
-  if (isNaN(num)) return String(quantity)
+  if (isNaN(num)) return unit ?? ''
   const qty = num === Math.round(num) ? String(Math.round(num)) : String(parseFloat(num.toFixed(2)))
   return unit ? `${qty} ${unit}` : qty
 }
+
+// Merge an array of raw GroceryItems (same ingredient_key) into one display entry
+function mergeItems(items: GroceryItem[]): MergedEntry {
+  let totalQty: number | null = 0
+  for (const item of items) {
+    if (item.quantity === null || totalQty === null) {
+      totalQty = null
+    } else {
+      totalQty += item.quantity
+    }
+  }
+  return {
+    ingredient_key: items[0].ingredient_key,
+    display_name: items[0].display_name,
+    quantity: totalQty !== null ? Math.round(totalQty * 100) / 100 : null,
+    unit: items[0].unit,
+    is_checked: items.every((i) => i.is_checked),
+    item_ids: items.map((i) => i.id),
+    recipe_count: items.length,
+  }
+}
+
+// Build combined list (one entry per ingredient across all recipes)
+function buildCombined(items: GroceryItem[]): MergedEntry[] {
+  const map = new Map<string, GroceryItem[]>()
+  for (const item of items) {
+    const key = item.ingredient_key
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(item)
+  }
+  return Array.from(map.values()).map(mergeItems)
+}
+
+// Group items by recipe_id
+function buildByRecipe(
+  items: GroceryItem[],
+  recipes: GroceryRecipe[]
+): { recipe: GroceryRecipe; items: GroceryItem[] }[] {
+  const recipeMap = new Map(recipes.map((r) => [r.recipe_id, r]))
+  const grouped = new Map<string, GroceryItem[]>()
+  for (const item of items) {
+    const rid = item.recipe_id ?? '__unknown__'
+    if (!grouped.has(rid)) grouped.set(rid, [])
+    grouped.get(rid)!.push(item)
+  }
+  return Array.from(grouped.entries())
+    .filter(([rid]) => recipeMap.has(rid))
+    .map(([rid, items]) => ({ recipe: recipeMap.get(rid)!, items }))
+}
+
+// Derive a grocery-aisle category from an ingredient name
+function categorize(name: string): string {
+  const n = name.toLowerCase()
+  if (/\b(milk|cream|butter|cheese|egg|yogurt|sour cream|half.and.half|whipping|mozzarella|cheddar|parmesan|ricotta|brie|feta)\b/.test(n))
+    return 'Dairy & Eggs'
+  if (/\b(chicken|beef|pork|lamb|turkey|veal|duck|bacon|sausage|ham|shrimp|salmon|tuna|cod|tilapia|crab|lobster|scallop|anchovy|prosciutto|pancetta|ground meat|steak|fillet|tenderloin)\b/.test(n))
+    return 'Meat & Seafood'
+  if (/\b(apple|banana|berry|strawberr|blueberr|raspberr|lemon|lime|orange|grape|mango|peach|pear|plum|cherry|pineapple|watermelon|melon|avocado|tomato|lettuce|spinach|kale|arugula|carrot|celery|cucumber|bell pepper|zucchini|squash|potato|sweet potato|broccoli|cauliflower|asparagus|corn|pea|green bean|snap pea|eggplant|artichoke|beet|radish|leek|shallot|scallion|green onion|cabbage|brussels sprout|bok choy|chard|collard|endive|fennel|turnip|parsnip|rutabaga|jicama|yam|taro|plantain|fruit|vegetable|produce|fresh herb|cilantro|parsley|basil|mint|dill|chive|sage|rosemary|thyme|oregano|tarragon|bay leaf)\b/.test(n))
+    return 'Produce'
+  if (/\b(bread|tortilla|pasta|rice|noodle|spaghetti|fettuccine|penne|linguine|ramen|udon|soba|couscous|quinoa|farro|barley|oat|cereal|cracker|chip|pita|roll|bun|baguette|sourdough|bagel|croissant|flour|corn meal|polenta)\b/.test(n))
+    return 'Grains & Bread'
+  if (/\b(garlic|onion|ginger|cumin|paprika|turmeric|cinnamon|cayenne|chili|pepper|salt|coriander|cardamom|clove|nutmeg|allspice|star anise|fennel seed|mustard seed|caraway|saffron|sumac|za.atar|herbes de provence|italian seasoning|old bay|cajun|curry|garam masala|five spice|seasoning|spice|herb)\b/.test(n))
+    return 'Herbs & Spices'
+  if (/\b(oil|olive oil|vegetable oil|canola|coconut oil|sesame oil|vinegar|balsamic|soy sauce|fish sauce|oyster sauce|hoisin|worcestershire|hot sauce|sriracha|ketchup|mustard|mayo|mayonnaise|ranch|tahini|miso|tomato paste|tomato sauce|canned|beans|lentil|chickpea|black bean|kidney bean|pinto|lentil|flour|sugar|brown sugar|honey|maple syrup|molasses|jam|peanut butter|almond butter|cocoa|chocolate|vanilla|baking powder|baking soda|yeast|cornstarch|broth|stock|bouillon|cream of tartar|breadcrumb|panko)\b/.test(n))
+    return 'Pantry'
+  if (/\b(frozen|ice cream|gelato|sorbet)\b/.test(n))
+    return 'Frozen'
+  if (/\b(water|juice|wine|beer|spirits|vodka|rum|whiskey|gin|tequila|coffee|tea|soda|sparkling|almond milk|oat milk|soy milk|beverage|drink|broth|stock)\b/.test(n))
+    return 'Beverages'
+  return 'Other'
+}
+
+// Build combined-within-category list grouped by aisle
+function buildByCategory(items: GroceryItem[]): { category: string; entries: MergedEntry[] }[] {
+  // First combine items by ingredient_key (same as combined view)
+  const combined = buildCombined(items)
+  // Then group those by category
+  const catMap = new Map<string, MergedEntry[]>()
+  for (const entry of combined) {
+    const cat = categorize(entry.display_name)
+    if (!catMap.has(cat)) catMap.set(cat, [])
+    catMap.get(cat)!.push(entry)
+  }
+
+  // Sort categories in a sensible aisle order
+  const order = ['Produce', 'Meat & Seafood', 'Dairy & Eggs', 'Grains & Bread', 'Herbs & Spices', 'Pantry', 'Frozen', 'Beverages', 'Other']
+  return Array.from(catMap.entries())
+    .sort(([a], [b]) => {
+      const ai = order.indexOf(a)
+      const bi = order.indexOf(b)
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+    })
+    .map(([category, entries]) => ({ category, entries }))
+}
+
+// ---------------------------------------------------------------------------
+// Segmented control
+// ---------------------------------------------------------------------------
+
+function ViewToggle({ value, onChange }: { value: ViewMode; onChange: (v: ViewMode) => void }) {
+  const options: { value: ViewMode; label: string }[] = [
+    { value: 'combined', label: 'Combined' },
+    { value: 'by-recipe', label: 'By Recipe' },
+    { value: 'by-category', label: 'By Category' },
+  ]
+  return (
+    <div style={{
+      display: 'inline-flex', borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--color-border)', overflow: 'hidden', marginBottom: '24px',
+    }}>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          style={{
+            padding: '7px 16px', fontSize: '13px', fontWeight: 500,
+            cursor: 'pointer', border: 'none', fontFamily: 'var(--font-sans)',
+            background: value === opt.value ? 'var(--color-primary)' : 'var(--color-surface)',
+            color: value === opt.value ? '#fff' : 'var(--color-text-muted)',
+            borderRight: '1px solid var(--color-border)',
+            transition: 'background 0.15s, color 0.15s',
+          }}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Item row components
+// ---------------------------------------------------------------------------
+
+// Combined / By-category row — one merged entry, bulk checkbox
+function MergedItemRow({
+  entry,
+  onToggle,
+}: {
+  entry: MergedEntry
+  onToggle: (key: string, val: boolean) => void
+}) {
+  const qtyLabel = formatQty(entry.quantity, entry.unit)
+  return (
+    <label style={{
+      display: 'flex', alignItems: 'center', gap: '12px',
+      padding: '11px 14px', background: 'var(--color-surface)',
+      border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+      cursor: 'pointer', userSelect: 'none',
+    }}>
+      <input
+        type="checkbox"
+        checked={entry.is_checked}
+        onChange={(e) => onToggle(entry.ingredient_key, e.target.checked)}
+        style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)', flexShrink: 0 }}
+      />
+      <span style={{
+        flex: 1, fontSize: '14px',
+        color: entry.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
+        textDecoration: entry.is_checked ? 'line-through' : 'none',
+      }}>
+        {qtyLabel && <span style={{ fontWeight: 600, marginRight: '6px' }}>{qtyLabel}</span>}
+        {entry.display_name}
+      </span>
+      {entry.recipe_count > 1 && (
+        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+          {entry.recipe_count} recipes
+        </span>
+      )}
+    </label>
+  )
+}
+
+// By-recipe row — single raw item, individual checkbox
+function SingleItemRow({
+  item,
+  onToggle,
+}: {
+  item: GroceryItem
+  onToggle: (id: string, val: boolean) => void
+}) {
+  const qtyLabel = formatQty(item.quantity, item.unit)
+  return (
+    <label style={{
+      display: 'flex', alignItems: 'center', gap: '12px',
+      padding: '11px 14px', background: 'var(--color-surface)',
+      border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+      cursor: 'pointer', userSelect: 'none',
+    }}>
+      <input
+        type="checkbox"
+        checked={item.is_checked}
+        onChange={(e) => onToggle(item.id, e.target.checked)}
+        style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)', flexShrink: 0 }}
+      />
+      <span style={{
+        flex: 1, fontSize: '14px',
+        color: item.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
+        textDecoration: item.is_checked ? 'line-through' : 'none',
+      }}>
+        {qtyLabel && <span style={{ fontWeight: 600, marginRight: '6px' }}>{qtyLabel}</span>}
+        {item.display_name}
+      </span>
+      {item.notes && (
+        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{item.notes}</span>
+      )}
+    </label>
+  )
+}
+
+function SectionHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <p style={{
+      fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
+      letterSpacing: '0.06em', color: 'var(--color-text-muted)',
+      marginBottom: '8px', marginTop: '20px',
+    }}>
+      {label}
+      {count > 0 && (
+        <span style={{ marginLeft: '8px', fontWeight: 400 }}>
+          — {count} item{count === 1 ? '' : 's'}
+        </span>
+      )}
+    </p>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
 
 export default function GroceryPage() {
   const { data: list, isLoading } = useGroceryList()
   const removeRecipe = useRemoveRecipeFromGrocery()
   const toggleItem = useToggleGroceryItem()
+  const toggleGroup = useToggleIngredientGroup()
   const navigate = useNavigate()
+  const [viewMode, setViewMode] = useState<ViewMode>('combined')
 
   if (isLoading) {
     return <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Loading...</div>
@@ -23,28 +284,49 @@ export default function GroceryPage() {
 
   const recipes: GroceryRecipe[] = list?.recipes ?? []
   const items: GroceryItem[] = list?.items ?? []
-  const checked = items.filter((i) => i.is_checked)
-  const unchecked = items.filter((i) => !i.is_checked)
+
+  const isEmpty = items.length === 0
+
+  // Subtitle text varies by view mode
+  const subtitles: Record<ViewMode, string> = {
+    combined: 'Quantities combined across all recipes. Tap to check off as you shop.',
+    'by-recipe': 'Ingredients grouped by recipe. Useful for cooking one dish at a time.',
+    'by-category': 'Ingredients grouped by grocery aisle. Great for efficient shopping.',
+  }
 
   return (
     <div style={{ maxWidth: '640px' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Grocery List</h1>
-      <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '28px' }}>
-        Items are merged across recipes. Tap to check off as you shop.
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '6px' }}>Grocery List</h1>
+      <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>
+        {subtitles[viewMode]}
       </p>
 
-      {/* Recipes contributing to list */}
+      {/* View mode toggle */}
+      {!isEmpty && <ViewToggle value={viewMode} onChange={setViewMode} />}
+
+      {/* Recipes in list */}
       {recipes.length > 0 && (
         <div style={{ marginBottom: '28px' }}>
-          <p style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '10px' }}>
+          <p style={{
+            fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
+            letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '10px',
+          }}>
             Recipes in list
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {recipes.map((r: GroceryRecipe) => (
-              <div key={r.recipe_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+              <div key={r.recipe_id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+              }}>
                 <button
                   onClick={() => navigate(`/recipes/${r.recipe_id}`)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-text)', padding: 0, fontFamily: 'var(--font-sans)', textAlign: 'left' }}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: '14px', fontWeight: 500, color: 'var(--color-text)',
+                    padding: 0, fontFamily: 'var(--font-sans)', textAlign: 'left',
+                  }}
                 >
                   {r.title}
                   {r.servings && r.base_servings && r.servings !== r.base_servings && (
@@ -58,15 +340,21 @@ export default function GroceryPage() {
                     if (!confirm(`Remove "${r.title}" from your grocery list?`)) return
                     await removeRecipe.mutateAsync(r.recipe_id)
                   }}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '13px', padding: '2px 6px' }}
-                >Remove</button>
+                  style={{
+                    background: 'none', border: 'none', color: 'var(--color-text-muted)',
+                    cursor: 'pointer', fontSize: '13px', padding: '2px 6px',
+                  }}
+                >
+                  Remove
+                </button>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {items.length === 0 ? (
+      {/* Empty state */}
+      {isEmpty ? (
         <EmptyState
           icon="🛒"
           title="Your grocery list is empty"
@@ -75,32 +363,24 @@ export default function GroceryPage() {
         />
       ) : (
         <>
-          {/* Unchecked items */}
-          {unchecked.length > 0 && (
-            <div style={{ marginBottom: '24px' }}>
-              <p style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '10px' }}>
-                To buy — {unchecked.length} item{unchecked.length === 1 ? '' : 's'}
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {unchecked.map((item: GroceryItem) => (
-                  <GroceryItemRow key={item.id} item={item} onToggle={(id, val) => toggleItem.mutate({ id, is_checked: val })} />
-                ))}
-              </div>
-            </div>
+          {viewMode === 'combined' && (
+            <CombinedView
+              items={items}
+              onToggleGroup={(key, val) => toggleGroup.mutate({ ingredient_key: key, is_checked: val })}
+            />
           )}
-
-          {/* Checked items */}
-          {checked.length > 0 && (
-            <div>
-              <p style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '10px' }}>
-                In cart — {checked.length}
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {checked.map((item: GroceryItem) => (
-                  <GroceryItemRow key={item.id} item={item} onToggle={(id, val) => toggleItem.mutate({ id, is_checked: val })} />
-                ))}
-              </div>
-            </div>
+          {viewMode === 'by-recipe' && (
+            <ByRecipeView
+              items={items}
+              recipes={recipes}
+              onToggleItem={(id, val) => toggleItem.mutate({ id, is_checked: val })}
+            />
+          )}
+          {viewMode === 'by-category' && (
+            <ByCategoryView
+              items={items}
+              onToggleGroup={(key, val) => toggleGroup.mutate({ ingredient_key: key, is_checked: val })}
+            />
           )}
         </>
       )}
@@ -108,23 +388,131 @@ export default function GroceryPage() {
   )
 }
 
-function GroceryItemRow({ item, onToggle }: { item: GroceryItem; onToggle: (id: string, val: boolean) => void }) {
-  const qtyLabel = formatQty(item.quantity, item.unit)
+// ---------------------------------------------------------------------------
+// Combined view
+// ---------------------------------------------------------------------------
+
+function CombinedView({
+  items,
+  onToggleGroup,
+}: {
+  items: GroceryItem[]
+  onToggleGroup: (key: string, val: boolean) => void
+}) {
+  const combined = buildCombined(items)
+  const unchecked = combined.filter((e) => !e.is_checked)
+  const checked = combined.filter((e) => e.is_checked)
+
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', userSelect: 'none' }}>
-      <input
-        type="checkbox"
-        checked={item.is_checked}
-        onChange={(e) => onToggle(item.id, e.target.checked)}
-        style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)', flexShrink: 0 }}
-      />
-      <span style={{ flex: 1, fontSize: '14px', color: item.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)', textDecoration: item.is_checked ? 'line-through' : 'none' }}>
-        {qtyLabel && <span style={{ fontWeight: 600, marginRight: '6px' }}>{qtyLabel}</span>}
-        {item.display_name}
-      </span>
-      {item.notes && (
-        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{item.notes}</span>
+    <>
+      {unchecked.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <SectionHeader label="To buy" count={unchecked.length} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {unchecked.map((entry) => (
+              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} />
+            ))}
+          </div>
+        </div>
       )}
-    </label>
+      {checked.length > 0 && (
+        <div>
+          <SectionHeader label="In cart" count={checked.length} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {checked.map((entry) => (
+              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// By Recipe view
+// ---------------------------------------------------------------------------
+
+function ByRecipeView({
+  items,
+  recipes,
+  onToggleItem,
+}: {
+  items: GroceryItem[]
+  recipes: GroceryRecipe[]
+  onToggleItem: (id: string, val: boolean) => void
+}) {
+  const groups = buildByRecipe(items, recipes)
+
+  return (
+    <>
+      {groups.map(({ recipe, items: recipeItems }) => {
+        const unchecked = recipeItems.filter((i) => !i.is_checked)
+        const checked = recipeItems.filter((i) => i.is_checked)
+        return (
+          <div key={recipe.recipe_id} style={{ marginBottom: '28px' }}>
+            {/* Recipe header */}
+            <div style={{
+              display: 'flex', alignItems: 'baseline', gap: '8px',
+              marginBottom: '8px', marginTop: '4px',
+            }}>
+              <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)' }}>
+                {recipe.title}
+              </p>
+              {recipe.servings && recipe.base_servings && recipe.servings !== recipe.base_servings && (
+                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                  {recipe.servings} servings
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {unchecked.map((item) => (
+                <SingleItemRow key={item.id} item={item} onToggle={onToggleItem} />
+              ))}
+              {checked.map((item) => (
+                <SingleItemRow key={item.id} item={item} onToggle={onToggleItem} />
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// By Category view
+// ---------------------------------------------------------------------------
+
+function ByCategoryView({
+  items,
+  onToggleGroup,
+}: {
+  items: GroceryItem[]
+  onToggleGroup: (key: string, val: boolean) => void
+}) {
+  const categories = buildByCategory(items)
+
+  return (
+    <>
+      {categories.map(({ category, entries }) => {
+        const unchecked = entries.filter((e) => !e.is_checked)
+        const checked = entries.filter((e) => e.is_checked)
+        const total = entries.length
+        return (
+          <div key={category} style={{ marginBottom: '28px' }}>
+            <SectionHeader label={category} count={total} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {unchecked.map((entry) => (
+                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} />
+              ))}
+              {checked.map((entry) => (
+                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} />
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </>
   )
 }
