@@ -1,37 +1,92 @@
-import { useState, FormEvent } from 'react'
+import { useState, useEffect, useRef, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCookbooks, useCreateCookbook, useDeleteCookbook, CookbookSummary } from '../../api/cookbooks'
+import {
+  useCookbooks, useCreateCookbook, useDeleteCookbook, useReorderCookbooks,
+  CookbookSummary,
+} from '../../api/cookbooks'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
 
-function CookbookCard({ cookbook, onDelete }: { cookbook: CookbookSummary; onDelete: (id: string) => void }) {
+function reorder<T>(list: T[], fromIdx: number, toIdx: number): T[] {
+  const next = [...list]
+  const [moved] = next.splice(fromIdx, 1)
+  next.splice(toIdx, 0, moved)
+  return next
+}
+
+function CookbookCard({
+  cookbook,
+  isDragging,
+  onDelete,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+}: {
+  cookbook: CookbookSummary
+  isDragging: boolean
+  onDelete: (id: string) => void
+  onDragStart: (e: React.DragEvent, id: string) => void
+  onDragOver: (e: React.DragEvent, id: string) => void
+  onDragEnd: () => void
+}) {
   const navigate = useNavigate()
   return (
     <div
-      style={{
-        background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-lg)', overflow: 'hidden', cursor: 'pointer',
-        transition: 'box-shadow 0.15s, transform 0.15s',
-      }}
+      draggable
+      onDragStart={(e) => onDragStart(e, cookbook.id)}
+      onDragOver={(e) => onDragOver(e, cookbook.id)}
+      onDragEnd={onDragEnd}
       onClick={() => navigate(`/cookbooks/${cookbook.id}`)}
-      onMouseEnter={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = 'var(--shadow-md)'; el.style.transform = 'translateY(-2px)' }}
-      onMouseLeave={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = 'none'; el.style.transform = 'translateY(0)' }}
+      onMouseEnter={(e) => {
+        if (isDragging) return
+        const el = e.currentTarget as HTMLDivElement
+        el.style.boxShadow = 'var(--shadow-md)'
+        el.style.transform = 'translateY(-2px)'
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLDivElement
+        el.style.boxShadow = 'none'
+        el.style.transform = 'translateY(0)'
+      }}
+      style={{
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        transition: isDragging ? 'none' : 'box-shadow 0.15s, transform 0.15s, opacity 0.15s',
+        opacity: isDragging ? 0.45 : 1,
+        userSelect: 'none',
+      }}
     >
-      {/* Cover / placeholder */}
       {cookbook.cover_url ? (
-        <img src={cookbook.cover_url} alt={cookbook.title} style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }} />
+        <img
+          src={cookbook.cover_url}
+          alt={cookbook.title}
+          style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }}
+          draggable={false}
+        />
       ) : (
         <div style={{
-          height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)', fontSize: '48px',
-        }}>📖</div>
+          height: '140px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(135deg, var(--color-primary) 0%, #c4501e 100%)',
+          fontSize: '48px',
+        }}>
+          📖
+        </div>
       )}
+
       <div style={{ padding: '14px 16px 16px' }}>
         <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>{cookbook.title}</h3>
         {cookbook.description && (
-          <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '8px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+          <p style={{
+            fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '8px',
+            overflow: 'hidden', display: '-webkit-box',
+            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          }}>
             {cookbook.description}
           </p>
         )}
@@ -41,8 +96,14 @@ function CookbookCard({ cookbook, onDelete }: { cookbook: CookbookSummary; onDel
           </span>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(cookbook.id) }}
-            style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '13px', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}
-          >Delete</button>
+            style={{
+              background: 'none', border: 'none', color: 'var(--color-text-muted)',
+              cursor: 'pointer', fontSize: '13px', padding: '2px 6px',
+              borderRadius: 'var(--radius-sm)',
+            }}
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
@@ -53,11 +114,43 @@ export default function CookbooksPage() {
   const { data: cookbooks, isLoading } = useCookbooks()
   const createMutation = useCreateCookbook()
   const deleteMutation = useDeleteCookbook()
+  const reorderMutation = useReorderCookbooks()
+
+  const [localCookbooks, setLocalCookbooks] = useState<CookbookSummary[]>([])
+  const draggingId = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (cookbooks && !draggingId.current) {
+      setLocalCookbooks(cookbooks)
+    }
+  }, [cookbooks])
 
   const [showCreate, setShowCreate] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [formError, setFormError] = useState('')
+
+  function handleDragStart(e: React.DragEvent, id: string) {
+    draggingId.current = id
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e: React.DragEvent, overId: string) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (!draggingId.current || draggingId.current === overId) return
+    setLocalCookbooks((prev) => {
+      const fromIdx = prev.findIndex((c) => c.id === draggingId.current)
+      const toIdx = prev.findIndex((c) => c.id === overId)
+      if (fromIdx === -1 || toIdx === -1) return prev
+      return reorder(prev, fromIdx, toIdx)
+    })
+  }
+
+  function handleDragEnd() {
+    draggingId.current = null
+    reorderMutation.mutate(localCookbooks.map((c) => c.id))
+  }
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
@@ -77,13 +170,20 @@ export default function CookbooksPage() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Cookbooks</h1>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Cookbooks</h1>
+          {localCookbooks.length > 1 && (
+            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+              Drag to reorder
+            </p>
+          )}
+        </div>
         <Button onClick={() => setShowCreate(true)}>+ New Cookbook</Button>
       </div>
 
       {isLoading ? (
         <CookbookGridSkeleton />
-      ) : !cookbooks?.length ? (
+      ) : !localCookbooks.length ? (
         <EmptyState
           icon="📖"
           title="No cookbooks yet"
@@ -92,8 +192,16 @@ export default function CookbooksPage() {
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' }}>
-          {cookbooks.map((cb: CookbookSummary) => (
-            <CookbookCard key={cb.id} cookbook={cb} onDelete={handleDelete} />
+          {localCookbooks.map((cb) => (
+            <CookbookCard
+              key={cb.id}
+              cookbook={cb}
+              isDragging={draggingId.current === cb.id}
+              onDelete={handleDelete}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+            />
           ))}
         </div>
       )}

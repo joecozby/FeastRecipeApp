@@ -7,6 +7,7 @@ export interface CookbookSummary {
   description: string | null
   cover_url: string | null
   recipe_count: number
+  display_order: number
   created_at: string
 }
 
@@ -61,6 +62,24 @@ export function useAddRecipeToCookbook() {
       client.post(`/cookbooks/${cookbookId}/recipes`, { recipe_id: recipeId }).then((r) => r.data),
     onSuccess: (_data, { cookbookId }) =>
       qc.invalidateQueries({ queryKey: ['cookbooks', cookbookId] }),
+  })
+}
+
+export function useReorderCookbooks() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (order: string[]) =>
+      client.patch('/cookbooks/reorder', { order }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cookbooks'] }),
+  })
+}
+
+export function useReorderCookbookRecipes(cookbookId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (order: string[]) =>
+      client.patch(`/cookbooks/${cookbookId}/recipes/reorder`, { order }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cookbooks', cookbookId] }),
   })
 }
 

@@ -20,11 +20,11 @@ async function getCookbookOrThrow(id, userId) {
 // GET /api/cookbooks
 router.get('/', asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, title, description, cover_url, created_at, updated_at,
+    `SELECT id, title, description, cover_url, display_order, created_at, updated_at,
             (SELECT count(*) FROM cookbook_recipes cr WHERE cr.cookbook_id = c.id) AS recipe_count
      FROM cookbooks c
      WHERE owner_id = $1 AND deleted_at IS NULL
-     ORDER BY created_at DESC`,
+     ORDER BY display_order ASC, created_at ASC`,
     [req.user.sub]
   )
   res.json(rows)
@@ -40,11 +40,47 @@ router.post(
   ],
   asyncHandler(async (req, res) => {
     const { title, description } = req.body
+    // Place new cookbook at the end of the user's ordered list
+    const { rows: [{ max_order }] } = await pool.query(
+      `SELECT coalesce(max(display_order), -1) AS max_order FROM cookbooks WHERE owner_id = $1 AND deleted_at IS NULL`,
+      [req.user.sub]
+    )
     const { rows: [cb] } = await pool.query(
-      `INSERT INTO cookbooks (owner_id, title, description) VALUES ($1,$2,$3) RETURNING *`,
-      [req.user.sub, title, description ?? null]
+      `INSERT INTO cookbooks (owner_id, title, description, display_order) VALUES ($1,$2,$3,$4) RETURNING *`,
+      [req.user.sub, title, description ?? null, max_order + 1]
     )
     res.status(201).json(cb)
+  })
+)
+
+// PATCH /api/cookbooks/reorder — must be before /:id to avoid route conflict
+router.patch(
+  '/reorder',
+  [
+    body('order').isArray({ min: 1 }),
+    body('order.*').isUUID(),
+    validate,
+  ],
+  asyncHandler(async (req, res) => {
+    const { order } = req.body
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (let i = 0; i < order.length; i++) {
+        await client.query(
+          `UPDATE cookbooks SET display_order = $1
+           WHERE id = $2 AND owner_id = $3 AND deleted_at IS NULL`,
+          [i, order[i], req.user.sub]
+        )
+      }
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
+    res.json({ ok: true })
   })
 )
 
@@ -143,6 +179,39 @@ router.post(
       [req.params.id, req.body.recipe_id, max_order + 1]
     )
     res.status(201).json({ cookbook_id: req.params.id, recipe_id: req.body.recipe_id })
+  })
+)
+
+// PATCH /api/cookbooks/:id/recipes/reorder
+router.patch(
+  '/:id/recipes/reorder',
+  [
+    param('id').isUUID(),
+    body('order').isArray({ min: 1 }),
+    body('order.*').isUUID(),
+    validate,
+  ],
+  asyncHandler(async (req, res) => {
+    await getCookbookOrThrow(req.params.id, req.user.sub)
+    const { order } = req.body
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (let i = 0; i < order.length; i++) {
+        await client.query(
+          `UPDATE cookbook_recipes SET display_order = $1
+           WHERE cookbook_id = $2 AND recipe_id = $3`,
+          [i, req.params.id, order[i]]
+        )
+      }
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
+    res.json({ ok: true })
   })
 )
 
