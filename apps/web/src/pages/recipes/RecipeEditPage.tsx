@@ -108,8 +108,10 @@ export default function RecipeEditPage() {
         tags: tags,
       })
       navigate(`/recipes/${id}`)
-    } catch {
-      setError('Save failed. Please try again.')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string; errors?: { msg: string }[] } } })?.response?.data
+      const detail = msg?.error ?? msg?.errors?.[0]?.msg ?? 'Save failed. Please try again.'
+      setError(detail)
     }
   }
 
