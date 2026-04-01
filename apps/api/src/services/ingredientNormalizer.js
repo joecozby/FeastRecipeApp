@@ -160,14 +160,53 @@ export function parseRawText(rawText) {
 }
 
 // ---------------------------------------------------------------------------
-// Resolve ingredient name → ingredients table row
+// Qualifier words that can be stripped from ingredient names before matching.
+// These are size, state, or quality descriptors that don't change WHICH
+// ingredient something is — only how it's described.
+//
+// Deliberately excludes flavor/variety words (sweet, dark, green, black, red,
+// white, smoked) because those often define a DIFFERENT ingredient
+// (e.g. "sweet potato" ≠ "potato", "black pepper" ≠ "pepper").
 // ---------------------------------------------------------------------------
 
-export async function resolveIngredient(name) {
-  if (!name) return null
+const QUALIFIER_WORDS = new Set([
+  // size
+  'small', 'medium', 'large', 'extra', 'baby', 'mini', 'jumbo', 'big',
+  // fat/oil quality (extra-virgin → virgin → olive oil)
+  'virgin', 'pure', 'refined', 'unrefined', 'cold', 'pressed',
+  // production descriptors
+  'organic', 'wild', 'natural', 'raw', 'whole',
+  // state
+  'fresh', 'dried', 'frozen', 'thawed', 'canned', 'cooked', 'uncooked',
+  // misc common qualifiers
+  'boneless', 'skinless', 'unsalted', 'salted', 'plain',
+])
 
-  const clean = name.toLowerCase().trim()
+/**
+ * Strip leading/embedded qualifier words and hyphens from an ingredient name.
+ * Returns the stripped string, or null if nothing was removed (to avoid
+ * unnecessary DB queries).
+ *
+ * Examples:
+ *   "small garlic clove"      → "garlic clove"
+ *   "extra-virgin olive oil"  → "olive oil"
+ *   "fresh cilantro"          → "cilantro"
+ *   "sweet potato"            → null  (sweet not in QUALIFIER_WORDS)
+ */
+function stripQualifiers(name) {
+  // Split on both spaces and hyphens so "extra-virgin" → ["extra","virgin"]
+  const words = name.split(/[\s-]+/)
+  const filtered = words.filter((w) => !QUALIFIER_WORDS.has(w.toLowerCase()))
+  const stripped = filtered.join(' ').trim()
+  // Only return if we actually removed something and still have a non-empty name
+  return stripped && stripped !== name ? stripped : null
+}
 
+// ---------------------------------------------------------------------------
+// findIngredient — lookup only, never creates a new row
+// ---------------------------------------------------------------------------
+
+async function findIngredient(clean) {
   // 1. Exact alias match
   const { rows: aliasRows } = await pool.query(
     `SELECT i.id, i.canonical_name
@@ -186,7 +225,7 @@ export async function resolveIngredient(name) {
   )
   if (exactRows.length) return exactRows[0]
 
-  // 3. Fuzzy match via pg_trgm (similarity > 0.5)
+  // 3. Fuzzy trigram similarity > 0.5
   const { rows: fuzzyRows } = await pool.query(
     `SELECT id, canonical_name, similarity(canonical_name, $1) AS sim
      FROM ingredients
@@ -197,7 +236,32 @@ export async function resolveIngredient(name) {
   )
   if (fuzzyRows.length) return fuzzyRows[0]
 
-  // 4. No match — create new ingredient
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Resolve ingredient name → ingredients table row
+// ---------------------------------------------------------------------------
+
+export async function resolveIngredient(name) {
+  if (!name) return null
+
+  const clean = name.toLowerCase().trim()
+
+  // Pass 1: try the full cleaned name
+  const found = await findIngredient(clean)
+  if (found) return found
+
+  // Pass 2: strip qualifier adjectives and try again
+  // e.g. "small garlic clove" → "garlic clove" → matches "garlic" at 0.70
+  //      "extra-virgin olive oil" → "olive oil" → exact match
+  const stripped = stripQualifiers(clean)
+  if (stripped) {
+    const strippedFound = await findIngredient(stripped)
+    if (strippedFound) return strippedFound
+  }
+
+  // Pass 3: no match at all — create a new canonical ingredient
   const { rows: [newIng] } = await pool.query(
     `INSERT INTO ingredients (canonical_name)
      VALUES ($1)

@@ -385,4 +385,142 @@ router.get(
   })
 )
 
+// ---------------------------------------------------------------------------
+// POST /api/recipes/renormalize
+// Re-runs ingredient normalization on every recipe_ingredient row belonging
+// to the authenticated user. Call once after deploying normalizer improvements
+// to fix ingredients that were stored with bad canonical names.
+//
+// What it does per ingredient row:
+//   1. Re-parse and re-resolve the raw_text using the updated normalizer
+//   2. If the resolved ingredient_id changed, update recipe_ingredients
+//   3. Rebuild grocery list items (if any) so quantities/grouping are correct
+// ---------------------------------------------------------------------------
+router.post('/renormalize', asyncHandler(async (req, res) => {
+  const userId = req.user.sub
+
+  // Fetch all ingredient rows for this user's recipes
+  const { rows: riRows } = await pool.query(
+    `SELECT ri.id, ri.raw_text, ri.ingredient_id, ri.recipe_id
+     FROM recipe_ingredients ri
+     JOIN recipes r ON r.id = ri.recipe_id
+     WHERE r.owner_id = $1 AND r.deleted_at IS NULL AND ri.raw_text IS NOT NULL`,
+    [userId]
+  )
+
+  let updated = 0
+  let unchanged = 0
+
+  for (const ri of riRows) {
+    const resolved = await normalizeIngredient(ri.raw_text)
+    const newIngredientId = resolved.ingredient_id ?? null
+
+    if (newIngredientId !== ri.ingredient_id) {
+      await pool.query(
+        `UPDATE recipe_ingredients
+         SET ingredient_id = $1
+         WHERE id = $2`,
+        [newIngredientId, ri.id]
+      )
+      updated++
+    } else {
+      unchanged++
+    }
+  }
+
+  // Rebuild grocery list items if the user has one, so updated ingredient_ids
+  // and ingredient_keys take effect immediately
+  const { rows: [listRow] } = await pool.query(
+    `SELECT id FROM grocery_lists WHERE user_id = $1`,
+    [userId]
+  )
+
+  let groceryRebuilt = false
+  if (listRow) {
+    const { rows: activeRecipes } = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM grocery_list_recipes WHERE grocery_list_id = $1`,
+      [listRow.id]
+    )
+    if (parseInt(activeRecipes[0].cnt) > 0) {
+      // Import the rebuild function inline via a fresh transaction
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+
+        // Snapshot checked state
+        const { rows: existingItems } = await client.query(
+          `SELECT ingredient_key, is_checked FROM grocery_list_items WHERE grocery_list_id = $1`,
+          [listRow.id]
+        )
+        const checkedByKey = new Map()
+        for (const item of existingItems) {
+          if (item.ingredient_key && item.is_checked) checkedByKey.set(item.ingredient_key, true)
+        }
+
+        // Wipe and re-insert
+        await client.query(`DELETE FROM grocery_list_items WHERE grocery_list_id = $1`, [listRow.id])
+
+        const { rows: listRecipes } = await client.query(
+          `SELECT glr.recipe_id, glr.servings AS chosen_servings, r.base_servings
+           FROM grocery_list_recipes glr
+           JOIN recipes r ON r.id = glr.recipe_id
+           WHERE glr.grocery_list_id = $1 AND r.deleted_at IS NULL`,
+          [listRow.id]
+        )
+
+        let order = 0
+        for (const lr of listRecipes) {
+          const scale = lr.base_servings
+            ? (lr.chosen_servings ?? lr.base_servings) / lr.base_servings : 1
+
+          const { rows: ings } = await client.query(
+            `SELECT ri.ingredient_id, ri.raw_text, ri.quantity, ri.unit,
+                    ri.display_order, i.canonical_name
+             FROM recipe_ingredients ri
+             LEFT JOIN ingredients i ON i.id = ri.ingredient_id
+             WHERE ri.recipe_id = $1 ORDER BY ri.display_order`,
+            [lr.recipe_id]
+          )
+
+          for (const ing of ings) {
+            const scaledQty = ing.quantity != null
+              ? Math.round(parseFloat(ing.quantity) * scale * 10000) / 10000 : null
+            const displayName = ing.canonical_name || ing.raw_text
+            const ingredientKey = ing.ingredient_id
+              ? `id:${ing.ingredient_id}:${ing.unit ?? ''}`
+              : `raw:${(ing.raw_text || '').toLowerCase().trim()}`
+            const isChecked = checkedByKey.get(ingredientKey) ?? false
+
+            await client.query(
+              `INSERT INTO grocery_list_items
+                 (grocery_list_id, recipe_id, ingredient_id, display_name,
+                  quantity, unit, is_checked, ingredient_key, display_order)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+              [listRow.id, lr.recipe_id, ing.ingredient_id ?? null, displayName,
+               scaledQty, ing.unit ?? null, isChecked, ingredientKey, order++]
+            )
+          }
+        }
+
+        await client.query(`UPDATE grocery_lists SET updated_at = now() WHERE id = $1`, [listRow.id])
+        await client.query('COMMIT')
+        groceryRebuilt = true
+      } catch (err) {
+        await client.query('ROLLBACK')
+        logger.warn('Grocery rebuild failed during renormalize', { err: err.message })
+      } finally {
+        client.release()
+      }
+    }
+  }
+
+  res.json({
+    message: 'Re-normalization complete',
+    ingredients_checked: riRows.length,
+    ingredients_updated: updated,
+    ingredients_unchanged: unchanged,
+    grocery_rebuilt: groceryRebuilt,
+  })
+}))
+
 export default router
