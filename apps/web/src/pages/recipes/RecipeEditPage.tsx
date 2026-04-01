@@ -1,6 +1,6 @@
-import { useState, FormEvent, useEffect } from 'react'
+import { useState, useRef, FormEvent, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useRecipe, useUpdateRecipe, useSaveRecipeContent, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
+import { useRecipe, useUpdateRecipe, useSaveRecipeContent, useUploadCoverImage, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea } from '../../components/ui/Input'
 
@@ -31,6 +31,9 @@ export default function RecipeEditPage() {
   const { data: recipe, isLoading } = useRecipe(id!)
   const updateMeta = useUpdateRecipe(id!)
   const saveContent = useSaveRecipeContent(id!)
+  const uploadCover = useUploadCoverImage(id!)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -163,6 +166,65 @@ export default function RecipeEditPage() {
       <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '28px' }}>Edit Recipe</h1>
 
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+
+        {/* Cover photo */}
+        <section>
+          <h2 style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '16px' }}>Cover Photo</h2>
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              position: 'relative', width: '100%', height: '200px', borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden', cursor: 'pointer', border: '2px dashed var(--color-border)',
+              background: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {(coverPreview ?? recipe.cover_url) ? (
+              <>
+                <img
+                  src={coverPreview ?? recipe.cover_url ?? ''}
+                  alt="Cover"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+                <div style={{
+                  position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  opacity: 0, transition: 'opacity 0.15s',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
+                >
+                  <span style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>
+                    {uploadCover.isPending ? 'Uploading…' : '📷 Change photo'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>📷</div>
+                <p style={{ fontSize: '14px', fontWeight: 500 }}>
+                  {uploadCover.isPending ? 'Uploading…' : 'Click to add a cover photo'}
+                </p>
+                <p style={{ fontSize: '12px', marginTop: '4px' }}>JPG, PNG or WebP · max 10 MB</p>
+              </div>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              setCoverPreview(URL.createObjectURL(file))
+              await uploadCover.mutateAsync(file)
+              e.target.value = ''
+            }}
+          />
+          {uploadCover.isError && (
+            <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '8px' }}>Upload failed — please try again.</p>
+          )}
+        </section>
 
         {/* Details */}
         <section>

@@ -133,6 +133,25 @@ export function useDeleteRecipe() {
   })
 }
 
+export function useUploadCoverImage(recipeId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('entity_type', 'recipe')
+      form.append('entity_id', recipeId)
+      return client.post('/media/upload', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recipes', recipeId] })
+      qc.invalidateQueries({ queryKey: ['recipes'] })
+    },
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Import
 // ---------------------------------------------------------------------------
