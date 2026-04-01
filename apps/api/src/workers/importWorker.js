@@ -137,8 +137,9 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
       return await saveRecipe(userId, parsed, sourceUrl, scraped)
     }
 
-    // Fall through to AI parse with page description/title as context
-    textToParse = [scraped.title, scraped.description].filter(Boolean).join('\n\n')
+    // Fall through to AI parse — use full page text if available, otherwise title+description
+    textToParse = scraped.raw_page_text
+      || [scraped.title, scraped.description].filter(Boolean).join('\n\n')
   }
 
   if (sourceType === 'instagram') {

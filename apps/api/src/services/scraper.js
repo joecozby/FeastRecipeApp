@@ -161,6 +161,29 @@ function fromMetaTags($, sourceUrl) {
 // Public: scrape a web URL
 // ---------------------------------------------------------------------------
 
+// Extract meaningful text from the page for AI fallback parsing
+function extractPageText($) {
+  // Remove noise elements
+  $('script, style, nav, header, footer, noscript, iframe, [aria-hidden="true"]').remove()
+
+  // Prefer recipe/article content areas if they exist
+  const contentSelectors = [
+    '[class*="recipe"]', '[id*="recipe"]',
+    '[class*="ingredient"]', '[class*="instruction"]', '[class*="direction"]',
+    'article', 'main', '.entry-content', '.post-content',
+  ]
+  for (const sel of contentSelectors) {
+    const el = $(sel).first()
+    if (el.length) {
+      const text = el.text().replace(/\s+/g, ' ').trim()
+      if (text.length > 300) return text.slice(0, 10000)
+    }
+  }
+
+  // Fall back to full body text
+  return $('body').text().replace(/\s+/g, ' ').trim().slice(0, 10000)
+}
+
 export async function scrapeUrl(url) {
   logger.debug('Scraping URL', { url })
 
@@ -172,9 +195,12 @@ export async function scrapeUrl(url) {
     return fromJsonLd(jsonLdNode, url)
   }
 
-  logger.debug('No JSON-LD found — falling back to meta tags', { url })
+  logger.debug('No JSON-LD found — falling back to meta tags + page text', { url })
   const $ = cheerio.load(html)
-  return fromMetaTags($, url)
+  const meta = fromMetaTags($, url)
+  // Attach full page text so the import worker can send it to the AI parser
+  meta.raw_page_text = extractPageText($)
+  return meta
 }
 
 // ---------------------------------------------------------------------------
