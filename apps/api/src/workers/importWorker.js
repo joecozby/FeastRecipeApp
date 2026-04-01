@@ -10,43 +10,61 @@ import { normalizeIngredient } from '../services/ingredientNormalizer.js'
 import { enqueueNutrition } from './nutritionWorker.js'
 
 // Download an image URL and upload it to Cloudinary, then attach to the recipe.
+// Accepts multiple candidate URLs and tries each in order — useful because
+// recipe CDN images are often hotlink-protected while og:image is not.
 // Failures are non-fatal — a missing cover photo shouldn't break the import.
-async function attachCoverImage(recipeId, ownerId, imageUrl) {
-  if (!imageUrl || !process.env.CLOUDINARY_URL) return
-  try {
-    const res = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const buffer = Buffer.from(await res.arrayBuffer())
-
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'feast/recipe',
-          transformation: [
-            { width: 1200, height: 800, crop: 'fill', gravity: 'auto' },
-            { quality: 'auto', fetch_format: 'auto' },
-          ],
-        },
-        (err, r) => err ? reject(err) : resolve(r)
-      )
-      Readable.from(buffer).pipe(stream)
-    })
-
-    const { rows: [asset] } = await pool.query(
-      `INSERT INTO media_assets
-         (owner_id, entity_type, entity_id, type, storage_key, url, width, height)
-       VALUES ($1,'recipe',$2,'image',$3,$4,$5,$6)
-       RETURNING id`,
-      [ownerId, recipeId, result.public_id, result.secure_url, result.width, result.height]
-    )
-    await pool.query(
-      `UPDATE recipes SET cover_media_id = $1 WHERE id = $2`,
-      [asset.id, recipeId]
-    )
-    logger.info(`Cover image attached for recipe ${recipeId}: ${result.secure_url}`)
-  } catch (err) {
-    logger.warn(`Cover image upload failed for recipe ${recipeId}: ${err.message}`)
+async function attachCoverImage(recipeId, ownerId, ...imageUrls) {
+  if (!process.env.CLOUDINARY_URL) {
+    logger.warn(`Cover image skipped for recipe ${recipeId}: CLOUDINARY_URL not set`)
+    return
   }
+
+  const candidates = imageUrls.filter(Boolean)
+  if (!candidates.length) return
+
+  for (const imageUrl of candidates) {
+    try {
+      logger.debug(`Cover image: trying ${imageUrl}`)
+      const res = await fetch(imageUrl, {
+        signal: AbortSignal.timeout(15000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FeastBot/1.0)' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const buffer = Buffer.from(await res.arrayBuffer())
+
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'feast/recipe',
+            transformation: [
+              { width: 1200, height: 800, crop: 'fill', gravity: 'auto' },
+              { quality: 'auto', fetch_format: 'auto' },
+            ],
+          },
+          (err, r) => err ? reject(err) : resolve(r)
+        )
+        Readable.from(buffer).pipe(stream)
+      })
+
+      const { rows: [asset] } = await pool.query(
+        `INSERT INTO media_assets
+           (owner_id, entity_type, entity_id, type, storage_key, url, width, height)
+         VALUES ($1,'recipe',$2,'image',$3,$4,$5,$6)
+         RETURNING id`,
+        [ownerId, recipeId, result.public_id, result.secure_url, result.width, result.height]
+      )
+      await pool.query(
+        `UPDATE recipes SET cover_media_id = $1 WHERE id = $2`,
+        [asset.id, recipeId]
+      )
+      logger.info(`Cover image attached for recipe ${recipeId}: ${result.secure_url}`)
+      return // success — stop trying further candidates
+    } catch (err) {
+      logger.warn(`Cover image download failed for ${imageUrl}: ${err.message} — trying next candidate`)
+    }
+  }
+
+  logger.warn(`Cover image: all ${candidates.length} candidate(s) failed for recipe ${recipeId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +190,7 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
     if (scraped.ingredients.length > 0 && scraped.instructions.length > 0) {
       logger.info('Import: JSON-LD extraction successful, skipping AI parse', { jobId })
       const recipeId = await saveRecipe(userId, scraped, sourceUrl, scraped)
-      return { recipeId, coverImageUrl: scraped.cover_image_url || null }
+      return { recipeId, coverImageUrl: scraped.cover_image_url || null, ogImage: scraped.og_image || null }
     }
 
     // Fall through to AI parse — use full page text if available, otherwise title+description
@@ -204,7 +222,7 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
 
   // Step 3 — Save
   const recipeId = await saveRecipe(userId, parsed, sourceUrl, { scraped, parsed })
-  return { recipeId, coverImageUrl: parsed.cover_image_url || null }
+  return { recipeId, coverImageUrl: parsed.cover_image_url || null, ogImage: scraped?.og_image || null }
 }
 
 // ---------------------------------------------------------------------------
@@ -232,9 +250,9 @@ export function startImportWorker() {
         [jobId]
       )
 
-      let recipeId, coverImageUrl
+      let recipeId, coverImageUrl, ogImage
       try {
-        ;({ recipeId, coverImageUrl } = await processImportJob(
+        ;({ recipeId, coverImageUrl, ogImage } = await processImportJob(
           jobId,
           userId,
           dbJob.source_type,
@@ -265,7 +283,8 @@ export function startImportWorker() {
 
       logger.info('Import job complete', { jobId, recipeId })
       enqueueNutrition(recipeId).catch(err => logger.warn(`Failed to enqueue nutrition: ${err.message}`))
-      if (coverImageUrl) attachCoverImage(recipeId, userId, coverImageUrl)
+      // Pass og_image as fallback — some CDN-hosted recipe images block direct download
+      attachCoverImage(recipeId, userId, coverImageUrl, scraped?.og_image)
 
       return { recipeId }
     },

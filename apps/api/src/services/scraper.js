@@ -188,17 +188,26 @@ export async function scrapeUrl(url) {
   logger.debug('Scraping URL', { url })
 
   const html = await fetchHtml(url, WEB_USER_AGENT)
+  const $ = cheerio.load(html)
+
+  // Always extract og:image — it's a reliable fallback since sites serve it
+  // for social sharing and rarely block direct downloads of it.
+  const ogImage = $('meta[property="og:image"]').attr('content') || null
+
   const jsonLdNode = extractJsonLd(html)
 
   if (jsonLdNode) {
     logger.debug('Found JSON-LD recipe', { url })
-    return fromJsonLd(jsonLdNode, url)
+    const result = fromJsonLd(jsonLdNode, url)
+    // Fill in og:image if JSON-LD didn't provide one, and always carry it
+    // as a fallback so the worker can try it if the primary URL is blocked.
+    if (!result.cover_image_url) result.cover_image_url = ogImage
+    result.og_image = ogImage
+    return result
   }
 
   logger.debug('No JSON-LD found — falling back to meta tags + page text', { url })
-  const $ = cheerio.load(html)
   const meta = fromMetaTags($, url)
-  // Attach full page text so the import worker can send it to the AI parser
   meta.raw_page_text = extractPageText($)
   return meta
 }
