@@ -1,4 +1,6 @@
 import { Worker } from 'bullmq'
+import { v2 as cloudinary } from 'cloudinary'
+import { Readable } from 'stream'
 import pool from '../config/db.js'
 import { newRedisConnection } from '../config/redis.js'
 import logger from '../config/logger.js'
@@ -6,6 +8,46 @@ import { scrapeUrl, scrapeInstagram } from '../services/scraper.js'
 import { parseRecipeText } from '../services/aiParser.js'
 import { normalizeIngredient } from '../services/ingredientNormalizer.js'
 import { enqueueNutrition } from './nutritionWorker.js'
+
+// Download an image URL and upload it to Cloudinary, then attach to the recipe.
+// Failures are non-fatal — a missing cover photo shouldn't break the import.
+async function attachCoverImage(recipeId, ownerId, imageUrl) {
+  if (!imageUrl || !process.env.CLOUDINARY_URL) return
+  try {
+    const res = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const buffer = Buffer.from(await res.arrayBuffer())
+
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'feast/recipe',
+          transformation: [
+            { width: 1200, height: 800, crop: 'fill', gravity: 'auto' },
+            { quality: 'auto', fetch_format: 'auto' },
+          ],
+        },
+        (err, r) => err ? reject(err) : resolve(r)
+      )
+      Readable.from(buffer).pipe(stream)
+    })
+
+    const { rows: [asset] } = await pool.query(
+      `INSERT INTO media_assets
+         (owner_id, entity_type, entity_id, type, storage_key, url, width, height)
+       VALUES ($1,'recipe',$2,'image',$3,$4,$5,$6)
+       RETURNING id`,
+      [ownerId, recipeId, result.public_id, result.secure_url, result.width, result.height]
+    )
+    await pool.query(
+      `UPDATE recipes SET cover_media_id = $1 WHERE id = $2`,
+      [asset.id, recipeId]
+    )
+    logger.info(`Cover image attached for recipe ${recipeId}: ${result.secure_url}`)
+  } catch (err) {
+    logger.warn(`Cover image upload failed for recipe ${recipeId}: ${err.message}`)
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Pipeline step: save parsed + normalized recipe to DB
@@ -129,12 +171,8 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
     // If scraper extracted full ingredients + instructions, skip AI
     if (scraped.ingredients.length > 0 && scraped.instructions.length > 0) {
       logger.info('Import: JSON-LD extraction successful, skipping AI parse', { jobId })
-      const parsed = {
-        ...scraped,
-        // scraped ingredients are raw_text only — AI parser enriches them
-        // but we still need to run normalizer, so pass through as-is
-      }
-      return await saveRecipe(userId, parsed, sourceUrl, scraped)
+      const recipeId = await saveRecipe(userId, scraped, sourceUrl, scraped)
+      return { recipeId, coverImageUrl: scraped.cover_image_url || null }
     }
 
     // Fall through to AI parse — use full page text if available, otherwise title+description
@@ -156,6 +194,7 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
   // Merge scraper metadata that AI wouldn't have (source_url, cover image, etc.)
   if (scraped) {
     parsed.source_url = parsed.source_url || sourceUrl
+    parsed.cover_image_url = parsed.cover_image_url || scraped.cover_image_url || null
     if (!parsed.title && scraped.title) parsed.title = scraped.title
     if (!parsed.cuisine && scraped.cuisine) parsed.cuisine = scraped.cuisine
     if (!parsed.servings && scraped.servings) parsed.servings = scraped.servings
@@ -164,7 +203,8 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
   }
 
   // Step 3 — Save
-  return await saveRecipe(userId, parsed, sourceUrl, { scraped, parsed })
+  const recipeId = await saveRecipe(userId, parsed, sourceUrl, { scraped, parsed })
+  return { recipeId, coverImageUrl: parsed.cover_image_url || null }
 }
 
 // ---------------------------------------------------------------------------
@@ -192,14 +232,14 @@ export function startImportWorker() {
         [jobId]
       )
 
-      let recipeId
+      let recipeId, coverImageUrl
       try {
-        recipeId = await processImportJob(
+        ;({ recipeId, coverImageUrl } = await processImportJob(
           jobId,
           userId,
           dbJob.source_type,
           dbJob.source_input
-        )
+        ))
       } catch (err) {
         const errorMessage = err.message === 'INSTAGRAM_BLOCKED'
           ? 'INSTAGRAM_BLOCKED'
@@ -225,6 +265,8 @@ export function startImportWorker() {
 
       logger.info('Import job complete', { jobId, recipeId })
       enqueueNutrition(recipeId).catch(err => logger.warn(`Failed to enqueue nutrition: ${err.message}`))
+      if (coverImageUrl) attachCoverImage(recipeId, userId, coverImageUrl)
+
       return { recipeId }
     },
     {
