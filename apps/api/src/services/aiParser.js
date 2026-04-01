@@ -136,7 +136,9 @@ async function callClaude(text) {
 
       const content = message.content[0]
       if (content.type !== 'text') throw new Error('Unexpected response type from Claude')
-      return JSON.parse(content.text)
+      // Strip markdown code fences if Claude wraps the JSON despite instructions
+      const raw = content.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+      return JSON.parse(raw)
     } catch (err) {
       lastErr = err
       if (isOverloaded(err) && attempt < RETRY_DELAYS_MS.length) {
