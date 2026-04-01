@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense } from 'react'
+import queryClient from './api/queryClient'
 
 import { PrivateRoute } from './components/layout/AppShell'
 import LoginPage from './pages/auth/LoginPage'
@@ -18,12 +19,6 @@ const CookbookDetailPage = lazy(() => import('./pages/cookbooks/CookbookDetailPa
 const GroceryPage        = lazy(() => import('./pages/GroceryPage'))
 const ProfilePage        = lazy(() => import('./pages/ProfilePage'))
 const AiPage             = lazy(() => import('./pages/AiPage'))
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { staleTime: 1000 * 60, retry: 1 },
-  },
-})
 
 function PageLoader() {
   return (

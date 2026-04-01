@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
+import queryClient from './queryClient'
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api',
@@ -18,6 +19,7 @@ client.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
+      queryClient.clear()
       useAuthStore.getState().logout()
     }
     return Promise.reject(err)

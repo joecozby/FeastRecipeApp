@@ -1,13 +1,15 @@
 import { useState, FormEvent, useEffect } from 'react'
 import { useProfile, useUpdateProfile } from '../api/profile'
 import { useAuthStore } from '../store/authStore'
+import queryClient from '../api/queryClient'
 import { Button } from '../components/ui/Button'
 import { Input, Textarea } from '../components/ui/Input'
 
 export default function ProfilePage() {
   const { data: profile, isLoading } = useProfile()
   const updateProfile = useUpdateProfile()
-  const logout = useAuthStore((s) => s.logout)
+  const _logout = useAuthStore((s) => s.logout)
+  const logout = () => { queryClient.clear(); _logout() }
 
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')

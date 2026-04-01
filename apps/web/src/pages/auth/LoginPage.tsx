@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import client from '../../api/client'
+import queryClient from '../../api/queryClient'
 import { useAuthStore } from '../../store/authStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -20,6 +21,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const { data } = await client.post('/auth/login', { email, password })
+      queryClient.clear()
       setAuth(data.token, data.user)
       navigate('/recipes')
     } catch (err: unknown) {
