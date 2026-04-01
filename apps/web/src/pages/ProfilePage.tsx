@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import queryClient from '../api/queryClient'
 import { Button } from '../components/ui/Button'
 import { Input, Textarea } from '../components/ui/Input'
+import client from '../api/client'
 
 export default function ProfilePage() {
   const { data: profile, isLoading } = useProfile()
@@ -16,12 +17,32 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [renormalizing, setRenormalizing] = useState(false)
+  const [renormalizeResult, setRenormalizeResult] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) return
     setDisplayName(profile.display_name ?? '')
     setBio(profile.bio ?? '')
   }, [profile])
+
+  async function handleRenormalize() {
+    setRenormalizing(true)
+    setRenormalizeResult(null)
+    try {
+      const { data } = await client.post('/recipes/renormalize')
+      setRenormalizeResult(
+        `Done — ${data.ingredients_updated} ingredient${data.ingredients_updated === 1 ? '' : 's'} updated, ` +
+        `${data.ingredients_unchanged} already correct.` +
+        (data.grocery_rebuilt ? ' Grocery list refreshed.' : '')
+      )
+      queryClient.invalidateQueries({ queryKey: ['grocery'] })
+    } catch {
+      setRenormalizeResult('Something went wrong. Please try again.')
+    } finally {
+      setRenormalizing(false)
+    }
+  }
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
@@ -129,6 +150,27 @@ export default function ProfilePage() {
             <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>You will need to sign back in to access your recipes.</p>
           </div>
           <Button variant="danger" onClick={logout}>Sign Out</Button>
+        </div>
+        <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '20px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Data Tools</p>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: '14px', fontWeight: 500, marginBottom: '2px' }}>Fix ingredient matching</p>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
+                Re-analyzes all your recipe ingredients and merges duplicates like
+                "extra-virgin olive oil" → "olive oil" and "small garlic clove" → "garlic".
+                Run this once after updating the app.
+              </p>
+              {renormalizeResult && (
+                <p style={{ fontSize: '13px', marginTop: '8px', color: renormalizeResult.includes('wrong') ? '#dc2626' : '#16a34a' }}>
+                  {renormalizeResult}
+                </p>
+              )}
+            </div>
+            <Button variant="secondary" onClick={handleRenormalize} loading={renormalizing} style={{ flexShrink: 0 }}>
+              {renormalizing ? 'Fixing...' : 'Fix Now'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
