@@ -192,6 +192,7 @@ router.patch(
 
     // When base_servings changes, recompute per_serving instantly from cached totals.
     // No USDA API call needed — totals don't change, only the divisor does.
+    // Falls back to enqueuing the worker if total_nutrients hasn't been computed yet.
     if (req.body.base_servings !== undefined) {
       const newBase = Math.max(1, req.body.base_servings || 1)
       const { rows: [snap] } = await pool.query(
@@ -208,6 +209,9 @@ router.patch(
           [JSON.stringify(perServing), req.params.id]
         )
         logger.info(`Nutrition per-serving updated synchronously for recipe ${req.params.id} (base_servings=${newBase})`)
+      } else {
+        // No cached totals yet — enqueue a full recalculation
+        enqueueNutrition(req.params.id).catch(err => logger.warn(`Failed to enqueue nutrition: ${err.message}`))
       }
     }
 

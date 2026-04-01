@@ -11,12 +11,24 @@ export const nutritionQueue = new Queue('nutrition', {
   defaultJobOptions: { attempts: 2, backoff: { type: 'fixed', delay: 30000 } },
 })
 
+// On-demand: always creates a fresh job so ingredient/servings edits are never silently dropped.
+// No fixed jobId — BullMQ generates a unique ID each time.
 export async function enqueueNutrition(recipeId) {
-  await nutritionQueue.add('compute', { recipe_id: recipeId }, {
-    jobId: `nutrition-${recipeId}`, // deduplicates — only one job per recipe at a time
-    removeOnComplete: 50,
-    removeOnFail: 20,
-  })
+  await nutritionQueue.add(
+    'compute',
+    { recipe_id: recipeId },
+    { removeOnComplete: 20, removeOnFail: 10 }
+  )
+}
+
+// Backfill-only: stable jobId so the startup query doesn't double-queue a recipe
+// that already has a pending job in the queue.
+export async function enqueueNutritionBackfill(recipeId) {
+  await nutritionQueue.add(
+    'compute',
+    { recipe_id: recipeId },
+    { jobId: `nutrition-backfill-${recipeId}`, removeOnComplete: 20, removeOnFail: 10 }
+  )
 }
 
 export function startNutritionWorker() {
@@ -108,7 +120,7 @@ export function startNutritionWorker() {
   ).then(({ rows }) => {
     if (!rows.length) return
     logger.info(`Nutrition backfill: enqueuing ${rows.length} recipes without snapshots`)
-    return Promise.all(rows.map(r => enqueueNutrition(r.id).catch(() => {})))
+    return Promise.all(rows.map(r => enqueueNutritionBackfill(r.id).catch(() => {})))
   }).catch(err => logger.warn(`Nutrition backfill query failed: ${err.message}`))
 
   return worker
