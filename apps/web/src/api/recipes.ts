@@ -16,6 +16,7 @@ export interface RecipeSummary {
   base_servings: number | null
   cover_url: string | null
   created_at: string
+  updated_at: string
 }
 
 export interface RecipeDetail extends RecipeSummary {
@@ -96,6 +97,7 @@ export function useUpdateRecipe(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recipes', id] })
       qc.invalidateQueries({ queryKey: ['recipes'] })
+      qc.invalidateQueries({ queryKey: ['nutrition', id] })
     },
   })
 }
@@ -105,7 +107,10 @@ export function useSaveRecipeContent(id: string) {
   return useMutation({
     mutationFn: (data: { ingredients: unknown[]; instructions: unknown[]; tags?: unknown[] }) =>
       client.put(`/recipes/${id}/content`, data).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recipes', id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recipes', id] })
+      qc.invalidateQueries({ queryKey: ['nutrition', id] })
+    },
   })
 }
 
@@ -154,11 +159,20 @@ export interface NutritionSnapshot {
   is_estimated: boolean
 }
 
-export function useRecipeNutrition(id: string) {
+export function useRecipeNutrition(id: string, recipeUpdatedAt?: string) {
   return useQuery({
     queryKey: ['nutrition', id],
     queryFn: () => client.get(`/recipes/${id}/nutrition`).then((r) => r.data as NutritionSnapshot | null),
     enabled: !!id,
+    staleTime: 0,
+    refetchInterval: (query) => {
+      const data = query.state.data as NutritionSnapshot | null | undefined
+      // No snapshot yet — poll until one appears
+      if (!data) return 5000
+      // Snapshot is older than the last recipe edit — poll until worker catches up
+      if (recipeUpdatedAt && data.computed_at < recipeUpdatedAt) return 5000
+      return false
+    },
   })
 }
 
