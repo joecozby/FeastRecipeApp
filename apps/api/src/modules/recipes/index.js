@@ -242,11 +242,12 @@ router.patch(
   '/:id/publish',
   [param('id').isUUID(), validate],
   asyncHandler(async (req, res) => {
-    await getRecipeOrThrow(req.params.id, req.user.sub)
+    const current = await getRecipeOrThrow(req.params.id, req.user.sub)
+    const newStatus = current.status === 'published' ? 'draft' : 'published'
     const { rows: [recipe] } = await pool.query(
-      `UPDATE recipes SET status = 'published', updated_at = now()
-       WHERE id = $1 AND owner_id = $2 RETURNING *`,
-      [req.params.id, req.user.sub]
+      `UPDATE recipes SET status = $1, updated_at = now()
+       WHERE id = $2 AND owner_id = $3 RETURNING *`,
+      [newStatus, req.params.id, req.user.sub]
     )
     res.json(recipe)
   })
