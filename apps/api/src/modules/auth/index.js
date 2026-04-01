@@ -111,8 +111,8 @@ router.patch(
   '/profile',
   requireAuth,
   [
-    body('display_name').optional().trim().notEmpty().withMessage('display_name cannot be blank'),
-    body('bio').optional().isString(),
+    body('display_name').optional({ nullable: true }).trim().notEmpty().withMessage('display_name cannot be blank'),
+    body('bio').optional({ nullable: true }).isString(),
     validate,
   ],
   asyncHandler(async (req, res) => {

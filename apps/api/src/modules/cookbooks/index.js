@@ -35,7 +35,7 @@ router.post(
   '/',
   [
     body('title').trim().notEmpty(),
-    body('description').optional().isString(),
+    body('description').optional({ nullable: true }).isString(),
     validate,
   ],
   asyncHandler(async (req, res) => {
@@ -75,8 +75,8 @@ router.patch(
   '/:id',
   [
     param('id').isUUID(),
-    body('title').optional().trim().notEmpty(),
-    body('description').optional().isString(),
+    body('title').optional({ nullable: true }).trim().notEmpty(),
+    body('description').optional({ nullable: true }).isString(),
     validate,
   ],
   asyncHandler(async (req, res) => {

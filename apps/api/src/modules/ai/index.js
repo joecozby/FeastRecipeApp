@@ -246,7 +246,7 @@ router.post(
   '/chat',
   [
     body('message').trim().notEmpty().withMessage('message is required'),
-    body('history').optional().isArray(),
+    body('history').optional({ nullable: true }).isArray(),
     validate,
   ],
   asyncHandler(async (req, res) => {

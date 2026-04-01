@@ -264,7 +264,7 @@ router.put(
     param('id').isUUID(),
     body('ingredients').isArray(),
     body('instructions').isArray(),
-    body('tags').optional().isArray(),
+    body('tags').optional({ nullable: true }).isArray(),
     validate,
   ],
   asyncHandler(async (req, res) => {

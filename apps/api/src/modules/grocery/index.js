@@ -182,7 +182,7 @@ router.post(
   '/recipes',
   [
     body('recipe_id').isUUID(),
-    body('servings').optional().isFloat({ min: 0.5 }).toFloat(),
+    body('servings').optional({ nullable: true }).isFloat({ min: 0.5 }).toFloat(),
     validate,
   ],
   asyncHandler(async (req, res) => {
@@ -256,8 +256,8 @@ router.patch(
   '/items/:id',
   [
     param('id').isUUID(),
-    body('is_checked').optional().isBoolean().toBoolean(),
-    body('notes').optional().isString(),
+    body('is_checked').optional({ nullable: true }).isBoolean().toBoolean(),
+    body('notes').optional({ nullable: true }).isString(),
     validate,
   ],
   asyncHandler(async (req, res) => {
