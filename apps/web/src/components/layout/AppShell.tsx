@@ -1,5 +1,6 @@
 import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
+import queryClient from '../../api/queryClient'
 
 const NAV_ITEMS = [
   { to: '/recipes',   label: 'Recipes',   icon: '🍽' },
@@ -20,6 +21,7 @@ function AppShell() {
   const navigate = useNavigate()
 
   function handleLogout() {
+    queryClient.clear()
     logout()
     navigate('/login')
   }
@@ -77,32 +79,44 @@ function AppShell() {
           ))}
         </div>
 
-        {/* User / logout */}
-        <div style={{
-          padding: '16px',
-          borderTop: '1px solid var(--color-border)',
-        }}>
+        {/* Profile nav card */}
+        <div style={{ padding: '10px 8px 12px', borderTop: '1px solid var(--color-border)' }}>
           <NavLink
             to="/profile"
-            style={{ display: 'block', textDecoration: 'none', marginBottom: '8px' }}
+            style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '8px 10px',
+              borderRadius: 'var(--radius-md)',
+              textDecoration: 'none',
+              background: isActive ? 'var(--color-primary-light)' : 'transparent',
+              transition: 'background 0.15s',
+              cursor: 'pointer',
+            })}
           >
+            {/* Avatar initial */}
             <div style={{
-              fontSize: '13px', fontWeight: 500, color: 'var(--color-text)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+              background: 'linear-gradient(135deg, var(--color-primary) 0%, #c4501e 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '12px', fontWeight: 700, color: '#fff',
             }}>
-              {user?.email}
+              {(user?.email ?? '?')[0].toUpperCase()}
+            </div>
+            {/* Name / email */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: '13px', fontWeight: 500, color: 'var(--color-text)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {user?.email}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                Account &amp; settings
+              </div>
             </div>
           </NavLink>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: 'none', border: 'none', padding: 0,
-              fontSize: '13px', color: 'var(--color-text-muted)',
-              cursor: 'pointer', textDecoration: 'underline',
-            }}
-          >
-            Sign out
-          </button>
         </div>
       </nav>
 
