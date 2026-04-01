@@ -1,6 +1,5 @@
-import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import queryClient from '../../api/queryClient'
 
 const NAV_ITEMS = [
   { to: '/recipes',   label: 'Recipes',   icon: '🍽' },
@@ -17,14 +16,7 @@ export function PrivateRoute() {
 }
 
 function AppShell() {
-  const { user, logout } = useAuthStore()
-  const navigate = useNavigate()
-
-  function handleLogout() {
-    queryClient.clear()
-    logout()
-    navigate('/login')
-  }
+  const { user } = useAuthStore()
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
