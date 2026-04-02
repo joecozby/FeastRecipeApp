@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useRecipe, usePublishRecipe, useDeleteRecipe, useRecipeNutrition, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
 import { useCookbooks, useAddRecipeToCookbook } from '../../api/cookbooks'
@@ -89,6 +89,41 @@ function formatTime(mins: number): string {
   const h = Math.floor(mins / 60)
   const m = mins % 60
   return m ? `${h}h ${m}m` : `${h}h`
+}
+
+// Number circle = 28px tall. To pin the number at the same Y as 2-line centering:
+//   2-line center from top = 1 × lineHeight
+//   marginTop for number  = lineHeight − (28 / 2) = lineHeight − 14
+const NUMBER_H = 28
+
+function InstructionStep({ step }: { step: Instruction }) {
+  const textRef = useRef<HTMLParagraphElement>(null)
+  const [isLong, setIsLong] = useState(false)
+  const [numMargin, setNumMargin] = useState(0)
+
+  useLayoutEffect(() => {
+    const el = textRef.current
+    if (!el) return
+    const lh = parseFloat(window.getComputedStyle(el).lineHeight)
+    if (!isNaN(lh) && lh > 0) {
+      const lines = Math.round(el.getBoundingClientRect().height / lh)
+      setIsLong(lines >= 3)
+      setNumMargin(Math.max(0, lh - NUMBER_H / 2))
+    }
+  }, [step.body])
+
+  return (
+    <li style={{ display: 'flex', gap: '16px', alignItems: isLong ? 'flex-start' : 'center' }}>
+      <span style={{
+        width: `${NUMBER_H}px`, height: `${NUMBER_H}px`, borderRadius: '50%',
+        background: 'var(--color-primary)', color: '#fff',
+        fontSize: '13px', fontWeight: 700, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginTop: isLong ? `${numMargin}px` : '0',
+      }}>{step.step_number}</span>
+      <p ref={textRef} style={{ fontSize: '14px', lineHeight: 1.65, margin: 0 }}>{step.body}</p>
+    </li>
+  )
 }
 
 export default function RecipeDetailPage() {
@@ -323,15 +358,7 @@ export default function RecipeDetailPage() {
               )}
               <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {steps.map((step: Instruction) => (
-                  <li key={step.id} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                    <span style={{
-                      width: '28px', height: '28px', borderRadius: '50%',
-                      background: 'var(--color-primary)', color: '#fff',
-                      fontSize: '13px', fontWeight: 700, flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>{step.step_number}</span>
-                    <p style={{ fontSize: '14px', lineHeight: 1.65, margin: 0, paddingTop: '4px' }}>{step.body}</p>
-                  </li>
+                  <InstructionStep key={step.id} step={step} />
                 ))}
               </ol>
             </div>
