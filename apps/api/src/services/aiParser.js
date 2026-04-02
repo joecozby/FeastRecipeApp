@@ -107,7 +107,23 @@ Rules:
 - confidence is your certainty that the ingredient was correctly parsed (0-1)
 - ambiguous is true if the ingredient string was unclear
 - instructions must be in order with sequential step_number values
-- tags should be lowercase, relevant meal-type or dietary labels only`
+- tags should be lowercase, relevant meal-type or dietary labels only
+
+Ingredient group_label rules:
+- Use group_label when a recipe has distinct sub-components with 3 or more ingredients each (e.g. a marinade, a sauce, a dough, a spice rub, a topping)
+- Label examples: "Marinade", "Sauce", "For the Dough", "Spice Blend", "Topping", "For the Chicken"
+- All ingredients in the same group must share the same group_label string exactly
+- Leave group_label null for simple recipes where all ingredients serve one unified purpose
+- Do not create a group just because a recipe has many ingredients — only group when sub-components are genuinely distinct
+
+Instruction group_label rules:
+- Use group_label when instructions fall into clearly distinct phases (e.g. prep, cook, assemble, rest)
+- Label examples: "Marinate", "Make the Sauce", "Cook the Chicken", "Assemble", "For the Dough", "Bake", "Finishing"
+- All steps within the same phase must share the same group_label string exactly
+- Leave group_label null for simple linear recipes (fewer than ~8 steps or no natural phases)
+- Do not force sections onto recipes that flow as one continuous process
+
+General group_label style: short, title-case, no trailing colon, no numbering`
 
 // ---------------------------------------------------------------------------
 // Real Claude API call
