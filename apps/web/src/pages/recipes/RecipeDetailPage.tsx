@@ -264,16 +264,17 @@ export default function RecipeDetailPage() {
       {/* Ingredients + Instructions grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '40px', alignItems: 'start' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700 }}>Ingredients</h2>
-            <div style={{ display: 'flex', background: 'var(--color-border)', borderRadius: 'var(--radius-sm)', padding: '3px', gap: '2px' }}>
+            <div style={{ display: 'flex', background: 'var(--color-silver)', borderRadius: 'var(--radius-sm)', padding: '3px', gap: '2px', width: 'fit-content' }}>
               {(['original', 'metric', 'us'] as const).map((sys) => (
                 <button key={sys} onClick={() => setUnitSystem(sys)} style={{
-                  padding: '3px 10px', borderRadius: 'calc(var(--radius-sm) - 2px)', border: 'none',
-                  fontSize: '11px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                  background: unitSystem === sys ? 'var(--color-surface)' : 'transparent',
-                  color: unitSystem === sys ? 'var(--color-text)' : 'var(--color-text-muted)',
+                  padding: '4px 12px', borderRadius: 'calc(var(--radius-sm) - 2px)', border: 'none',
+                  fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                  background: unitSystem === sys ? 'var(--color-primary)' : 'transparent',
+                  color: unitSystem === sys ? '#fff' : 'var(--color-text-muted)',
                   boxShadow: unitSystem === sys ? 'var(--shadow-sm)' : 'none',
+                  transition: 'all 0.15s var(--ease-out)',
                 }}>
                   {sys === 'original' ? 'Original' : sys === 'metric' ? 'Metric' : 'US'}
                 </button>
