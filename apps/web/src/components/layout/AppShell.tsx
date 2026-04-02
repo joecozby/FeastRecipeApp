@@ -23,14 +23,17 @@ const NAV_ITEMS = [
   { to: '/ai',            label: 'AI Chef',       Icon: Sparkles },
 ]
 
-// Bottom nav shows 5 key items + Profile
+// Bottom nav — icons only so all 8 destinations fit on any phone width.
+// Matches the full sidebar nav so nothing is desktop-only.
 const BOTTOM_NAV_ITEMS = [
-  { to: '/recipes',       label: 'Recipes',  Icon: UtensilsCrossed },
-  { to: '/search',        label: 'Search',   Icon: Search },
-  { to: '/import',        label: 'Import',   Icon: PlusCircle },
-  { to: '/grocery',       label: 'Grocery',  Icon: ShoppingCart },
-  { to: '/spice-cabinet', label: 'Cabinet',  Icon: FlameKindling },
-  { to: '/profile',       label: 'Profile',  Icon: User },
+  { to: '/recipes',       Icon: UtensilsCrossed, label: 'Recipes'       },
+  { to: '/search',        Icon: Search,          label: 'Search'        },
+  { to: '/import',        Icon: PlusCircle,      label: 'Import', primary: true },
+  { to: '/cookbooks',     Icon: BookOpen,        label: 'Cookbooks'     },
+  { to: '/grocery',       Icon: ShoppingCart,    label: 'Grocery'       },
+  { to: '/ai',            Icon: Sparkles,        label: 'AI Chef'       },
+  { to: '/spice-cabinet', Icon: FlameKindling,   label: 'Cabinet'       },
+  { to: '/profile',       Icon: User,            label: 'Profile'       },
 ]
 
 export function PrivateRoute() {
@@ -182,36 +185,40 @@ function AppShell() {
       {isMobile && (
         <nav style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
-          height: '64px',
+          height: '56px',
           background: 'var(--color-surface)',
           borderTop: '1px solid var(--color-border)',
           display: 'flex',
           zIndex: 100,
-          paddingBottom: 'env(safe-area-inset-bottom)', // iPhone notch support
+          paddingBottom: 'env(safe-area-inset-bottom)',
         }}>
-          {BOTTOM_NAV_ITEMS.map(({ to, label, Icon }) => (
+          {BOTTOM_NAV_ITEMS.map(({ to, Icon, label, primary }) => (
             <NavLink
               key={to}
               to={to}
+              title={label}
               style={({ isActive }) => ({
                 flex: 1,
-                display: 'flex', flexDirection: 'column',
+                display: 'flex',
                 alignItems: 'center', justifyContent: 'center',
-                gap: '3px',
                 textDecoration: 'none',
                 color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
                 transition: 'color 0.15s',
                 minWidth: 0,
               })}
             >
-              <Icon size={20} strokeWidth={1.75} />
-              <span style={{
-                fontSize: '10px', fontWeight: 500,
-                fontFamily: 'var(--font-sans)',
-                letterSpacing: '0.01em',
-              }}>
-                {label}
-              </span>
+              {primary ? (
+                // Import gets a filled circle background to stand out as primary action
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: 'var(--color-primary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon size={20} strokeWidth={2} color="#fff" />
+                </div>
+              ) : (
+                <Icon size={22} strokeWidth={1.75} />
+              )}
             </NavLink>
           ))}
         </nav>
