@@ -36,12 +36,36 @@ interface MergedEntry {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Units that are abbreviations or mass nouns — never pluralize
+const UNIT_UNCHANGED = new Set([
+  'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'g', 'kg', 'ml', 'l', 'cl', 'dl',
+  'fl oz', 'each', 'doz', 'dozen',
+])
+
+// Irregular singular → plural mappings
+const UNIT_IRREGULAR: Record<string, string> = {
+  leaf: 'leaves',
+  loaf: 'loaves',
+  half: 'halves',
+}
+
+function pluralizeUnit(unit: string, quantity: number): string {
+  if (quantity === 1) return unit
+  const u = unit.toLowerCase().trim()
+  if (UNIT_UNCHANGED.has(u)) return unit
+  if (u.endsWith('s')) return unit               // already plural / mass noun
+  if (UNIT_IRREGULAR[u]) return UNIT_IRREGULAR[u]
+  if (/(?:ch|sh|[xz])$/.test(u)) return unit + 'es'  // pinch→pinches, dash→dashes, box→boxes
+  return unit + 's'                              // tablespoon→tablespoons, cup→cups, etc.
+}
+
 function formatQty(quantity: number | null, unit: string | null): string {
   if (quantity === null || quantity === undefined) return unit ?? ''
   const num = Number(quantity)
   if (isNaN(num)) return unit ?? ''
   const qty = num === Math.round(num) ? String(Math.round(num)) : String(parseFloat(num.toFixed(2)))
-  return unit ? `${qty} ${unit}` : qty
+  const displayUnit = unit ? pluralizeUnit(unit, num) : null
+  return displayUnit ? `${qty} ${displayUnit}` : qty
 }
 
 // Merge an array of raw GroceryItems (same ingredient_key) into one display entry

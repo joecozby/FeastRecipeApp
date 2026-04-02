@@ -12,6 +12,22 @@ function formatQty(n: number): string {
   return String(parseFloat(n.toFixed(1)))
 }
 
+const UNIT_UNCHANGED = new Set([
+  'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'g', 'kg', 'ml', 'l', 'cl', 'dl',
+  'fl oz', 'each', 'doz', 'dozen',
+])
+const UNIT_IRREGULAR: Record<string, string> = { leaf: 'leaves', loaf: 'loaves', half: 'halves' }
+
+function pluralizeUnit(unit: string, quantity: number): string {
+  if (quantity === 1) return unit
+  const u = unit.toLowerCase().trim()
+  if (UNIT_UNCHANGED.has(u)) return unit
+  if (u.endsWith('s')) return unit
+  if (UNIT_IRREGULAR[u]) return UNIT_IRREGULAR[u]
+  if (/(?:ch|sh|[xz])$/.test(u)) return unit + 'es'
+  return unit + 's'
+}
+
 function scaleQty(qty: number | null, scale: number): string {
   if (qty === null) return ''
   const scaled = qty * scale
@@ -328,7 +344,11 @@ export default function RecipeDetailPage() {
                   const scaledQty = ing.quantity !== null ? ing.quantity * scale : null
                   const converted = unitSystem !== 'original' ? convertUnit(scaledQty, ing.unit, unitSystem) : null
                   const qtyStr  = converted ? converted.quantity : scaleQty(ing.quantity, scale)
-                  const unitStr = converted ? converted.unit     : ing.unit
+                  const rawUnit = converted ? converted.unit : ing.unit
+                  const scaledQtyNum = converted
+                    ? parseFloat(converted.quantity) || 1
+                    : (ing.quantity ?? 1) * scale
+                  const unitStr = rawUnit ? pluralizeUnit(rawUnit, scaledQtyNum) : rawUnit
                   const parts = [qtyStr, unitStr, ing.canonical_name ?? ing.raw_text, ing.preparation].filter(Boolean)
                   return (
                     <li key={ing.id} style={{ fontSize: '14px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
