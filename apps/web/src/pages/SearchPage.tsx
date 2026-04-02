@@ -2,8 +2,10 @@ import { useRef, useCallback } from 'react'
 import { useSearch } from '../api/search'
 import { RecipeCard } from '../components/ui/RecipeCard'
 import { useFilterState } from '../hooks/useFilterState'
+import { useMobile } from '../hooks/useMobile'
 
 export default function SearchPage() {
+  const isMobile = useMobile()
   const [q, setQ]             = useFilterState<string>('q', '')
   const [cuisine, setCuisine] = useFilterState<string>('cuisine', '')
   const [difficulty, setDifficulty] = useFilterState<'' | 'easy' | 'medium' | 'hard'>('difficulty', '')
@@ -44,7 +46,7 @@ export default function SearchPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search by title, ingredient, or description..."
-          autoFocus
+          autoFocus={!isMobile}
           style={{
             width: '100%', padding: '11px 16px',
             borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)',
