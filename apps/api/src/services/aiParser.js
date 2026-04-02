@@ -179,6 +179,56 @@ async function callClaude(text) {
  * Uses the Anthropic API when ANTHROPIC_API_KEY is set.
  * Falls back to a hardcoded stub so the pipeline runs without a key.
  */
+// ---------------------------------------------------------------------------
+// Post-parse HTML entity cleanup
+// Belt-and-suspenders: catches any entities that sneak through on text/
+// caption imports where the scraper's decoder wasn't in the path.
+// ---------------------------------------------------------------------------
+
+function decodeEntities(str) {
+  if (!str || typeof str !== 'string') return str
+  return str
+    .replace(/&amp;/gi,    '&')
+    .replace(/&lt;/gi,     '<')
+    .replace(/&gt;/gi,     '>')
+    .replace(/&quot;/gi,   '"')
+    .replace(/&apos;/gi,   "'")
+    .replace(/&#39;/g,     "'")
+    .replace(/&nbsp;/gi,   ' ')
+    .replace(/&rsquo;/gi,  '\u2019')
+    .replace(/&lsquo;/gi,  '\u2018')
+    .replace(/&rdquo;/gi,  '\u201D')
+    .replace(/&ldquo;/gi,  '\u201C')
+    .replace(/&ndash;/gi,  '\u2013')
+    .replace(/&mdash;/gi,  '\u2014')
+    .replace(/&hellip;/gi, '\u2026')
+    .replace(/&deg;/gi,    '\u00B0')
+    .replace(/&#(\d+);/g,       (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&#x([0-9a-f]+);/gi,(_, h) => String.fromCharCode(parseInt(h, 16)))
+}
+
+function sanitizeParsed(parsed) {
+  if (!parsed) return parsed
+  return {
+    ...parsed,
+    title:       decodeEntities(parsed.title),
+    description: decodeEntities(parsed.description),
+    ingredients: (parsed.ingredients || []).map((ing) => ({
+      ...ing,
+      raw_text:    decodeEntities(ing.raw_text),
+      name:        decodeEntities(ing.name),
+      preparation: decodeEntities(ing.preparation),
+      notes:       decodeEntities(ing.notes),
+      group_label: decodeEntities(ing.group_label),
+    })),
+    instructions: (parsed.instructions || []).map((step) => ({
+      ...step,
+      body:        decodeEntities(step.body),
+      group_label: decodeEntities(step.group_label),
+    })),
+  }
+}
+
 export async function parseRecipeText(text) {
   if (!process.env.ANTHROPIC_API_KEY) {
     logger.warn('ANTHROPIC_API_KEY not set — returning stub AI response')
@@ -189,7 +239,7 @@ export async function parseRecipeText(text) {
     logger.debug('Calling Claude to parse recipe text')
     const parsed = await callClaude(text)
     logger.debug('Claude parse complete', { title: parsed.title })
-    return parsed
+    return sanitizeParsed(parsed)
   } catch (err) {
     logger.error('Claude API call failed', { error: err.message })
     throw new Error(`AI parsing failed: ${err.message}`)

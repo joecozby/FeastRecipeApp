@@ -2,6 +2,39 @@ import fetch from 'node-fetch'
 import * as cheerio from 'cheerio'
 import logger from '../config/logger.js'
 
+// ---------------------------------------------------------------------------
+// HTML entity decoder
+// Handles both named entities (&amp; &rsquo; etc.) and numeric refs (&#39; &#x27;)
+// ---------------------------------------------------------------------------
+
+function decodeHtmlEntities(str) {
+  if (!str || typeof str !== 'string') return str
+  return str
+    // Named entities most commonly found in recipe JSON-LD
+    .replace(/&amp;/gi,    '&')
+    .replace(/&lt;/gi,     '<')
+    .replace(/&gt;/gi,     '>')
+    .replace(/&quot;/gi,   '"')
+    .replace(/&apos;/gi,   "'")
+    .replace(/&#39;/g,     "'")
+    .replace(/&nbsp;/gi,   ' ')
+    .replace(/&rsquo;/gi,  '\u2019')   // '
+    .replace(/&lsquo;/gi,  '\u2018')   // '
+    .replace(/&rdquo;/gi,  '\u201D')   // "
+    .replace(/&ldquo;/gi,  '\u201C')   // "
+    .replace(/&ndash;/gi,  '\u2013')   // –
+    .replace(/&mdash;/gi,  '\u2014')   // —
+    .replace(/&hellip;/gi, '\u2026')   // …
+    .replace(/&deg;/gi,    '\u00B0')   // °
+    .replace(/&frac12;/gi, '\u00BD')   // ½
+    .replace(/&frac14;/gi, '\u00BC')   // ¼
+    .replace(/&frac34;/gi, '\u00BE')   // ¾
+    // Decimal numeric references  &#160;
+    .replace(/&#(\d+);/g,      (_, n)   => String.fromCharCode(parseInt(n, 10)))
+    // Hex numeric references  &#x27;
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+}
+
 const WEB_USER_AGENT =
   'Mozilla/5.0 (compatible; FeastBot/1.0; +https://feastapp.io/bot)'
 const MOBILE_USER_AGENT =
@@ -82,24 +115,24 @@ function fromJsonLd(node, sourceUrl) {
   }
 
   const ingredients = toArray(node.recipeIngredient).map((t) => ({
-    raw_text: String(t).trim(),
+    raw_text: decodeHtmlEntities(String(t).trim()),
   }))
 
   const instructions = toArray(node.recipeInstructions).flatMap((item, i) => {
     // HowToStep
     if (item['@type'] === 'HowToStep') {
-      return [{ step_number: i + 1, body: item.text || item.name || '' }]
+      return [{ step_number: i + 1, body: decodeHtmlEntities(item.text || item.name || '') }]
     }
     // HowToSection — flatten its sub-steps
     if (item['@type'] === 'HowToSection') {
       return toArray(item.itemListElement).map((step, j) => ({
         step_number: i * 100 + j + 1,
-        body: step.text || step.name || '',
-        group_label: item.name || null,
+        body: decodeHtmlEntities(step.text || step.name || ''),
+        group_label: decodeHtmlEntities(item.name || null),
       }))
     }
     // Plain string
-    return [{ step_number: i + 1, body: String(item).trim() }]
+    return [{ step_number: i + 1, body: decodeHtmlEntities(String(item).trim()) }]
   }).filter((s) => s.body)
 
   // Re-number steps sequentially
@@ -114,8 +147,8 @@ function fromJsonLd(node, sourceUrl) {
   })()
 
   return {
-    title: node.name || null,
-    description: node.description || null,
+    title: decodeHtmlEntities(node.name || null),
+    description: decodeHtmlEntities(node.description || null),
     servings,
     prep_time_mins: duration(node.prepTime),
     cook_time_mins: duration(node.cookTime),
