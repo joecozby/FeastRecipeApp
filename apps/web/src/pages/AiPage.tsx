@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAiChat, ChatMessage } from '../api/ai'
+import { useMobile } from '../hooks/useMobile'
 
 interface DisplayMessage {
   role: 'user' | 'assistant'
@@ -24,8 +25,12 @@ export default function AiPage() {
   const chat = useAiChat()
   const bottomRef = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
+  const isMobile = useMobile()
 
+  // Only scroll to bottom when there are actual messages — never on initial
+  // mount — so the page doesn't shift/jump when navigating to this tab.
   useEffect(() => {
+    if (messages.length === 0 && !chat.isPending) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, chat.isPending])
 
@@ -65,7 +70,14 @@ export default function AiPage() {
   }
 
   return (
-    <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}>
+    <div style={{
+      maxWidth: '720px', display: 'flex', flexDirection: 'column',
+      // Mobile: subtract top bar (56px+16px) + bottom nav (56px+28px) already
+      // baked into AppShell padding, then use dvh so the browser chrome
+      // (address bar) is excluded and no overflow/shift occurs on navigation.
+      // Desktop: original calc works fine since there's no top/bottom bar.
+      height: isMobile ? 'calc(100dvh - 156px)' : 'calc(100vh - 64px)',
+    }}>
       <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px' }}>AI Chef</h1>
       <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
         Ask cooking questions, create recipes, pick meals from your cookbooks, or say "add these to my grocery list."
