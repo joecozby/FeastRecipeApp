@@ -20,6 +20,7 @@ const CookbookDetailPage = lazy(() => import('./pages/cookbooks/CookbookDetailPa
 const GroceryPage        = lazy(() => import('./pages/GroceryPage'))
 const ProfilePage        = lazy(() => import('./pages/ProfilePage'))
 const AiPage             = lazy(() => import('./pages/AiPage'))
+const SpiceCabinetPage   = lazy(() => import('./pages/SpiceCabinetPage'))
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="/grocery"        element={<GroceryPage />} />
             <Route path="/profile"        element={<ProfilePage />} />
             <Route path="/ai"             element={<AiPage />} />
+            <Route path="/spice-cabinet" element={<SpiceCabinetPage />} />
           </Route>
 
           {/* Catch-all */}

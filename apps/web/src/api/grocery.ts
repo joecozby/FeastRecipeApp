@@ -14,6 +14,8 @@ export interface GroceryItem {
   is_checked: boolean
   notes: string | null
   display_order: number
+  spice_cabinet_master_id: number | null
+  in_spice_cabinet: boolean
 }
 
 export interface GroceryRecipe {

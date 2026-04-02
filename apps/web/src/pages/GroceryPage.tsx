@@ -7,6 +7,7 @@ import {
   GroceryItem,
   GroceryRecipe,
 } from '../api/grocery'
+import { useMySpiceCabinet, useAddToSpiceCabinet } from '../api/spiceCabinet'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
@@ -27,6 +28,8 @@ interface MergedEntry {
   is_checked: boolean   // true when ALL source rows are checked
   item_ids: string[]    // ids of every raw item in this group (for bulk toggle)
   recipe_count: number  // how many recipes contribute
+  in_spice_cabinet: boolean
+  spice_cabinet_master_id: number | null
 }
 
 // ---------------------------------------------------------------------------
@@ -59,6 +62,8 @@ function mergeItems(items: GroceryItem[]): MergedEntry {
     is_checked: items.every((i) => i.is_checked),
     item_ids: items.map((i) => i.id),
     recipe_count: items.length,
+    in_spice_cabinet: items[0].in_spice_cabinet ?? false,
+    spice_cabinet_master_id: items[0].spice_cabinet_master_id ?? null,
   }
 }
 
@@ -204,7 +209,22 @@ function MergedItemRow({
         {qtyLabel && <span style={{ fontWeight: 600, marginRight: '6px' }}>{qtyLabel}</span>}
         {entry.display_name}
       </span>
-      {entry.recipe_count > 1 && (
+      {entry.in_spice_cabinet && (
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: '3px',
+          fontSize: '11px', fontWeight: 500,
+          color: 'rgba(232, 106, 51, 0.75)',
+          background: 'rgba(232, 106, 51, 0.08)',
+          border: '1px solid rgba(232, 106, 51, 0.2)',
+          borderRadius: 'var(--radius-full)',
+          padding: '2px 8px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+        }}>
+          🧂 In cabinet
+        </span>
+      )}
+      {!entry.in_spice_cabinet && entry.recipe_count > 1 && (
         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
           {entry.recipe_count} recipes
         </span>
@@ -217,36 +237,114 @@ function MergedItemRow({
 function SingleItemRow({
   item,
   onToggle,
+  ownedMasterIds,
+  onAddToCabinet,
+  dismissedSuggestions,
+  onDismissSuggestion,
 }: {
   item: GroceryItem
   onToggle: (id: string, val: boolean) => void
+  ownedMasterIds: Set<number>
+  onAddToCabinet: (masterId: number) => void
+  dismissedSuggestions: Set<number>
+  onDismissSuggestion: (masterId: number) => void
 }) {
   const qtyLabel = formatQty(item.quantity, item.unit)
+
+  // Show the "add to cabinet?" suggestion when:
+  // - item is just checked
+  // - has a matching master item
+  // - not already in cabinet
+  // - not dismissed
+  const showSuggestion =
+    item.is_checked &&
+    item.spice_cabinet_master_id !== null &&
+    !ownedMasterIds.has(item.spice_cabinet_master_id) &&
+    !dismissedSuggestions.has(item.spice_cabinet_master_id!)
+
   return (
-    <label style={{
-      display: 'flex', alignItems: 'center', gap: '12px',
-      padding: '11px 14px', background: 'var(--color-surface)',
-      border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
-      cursor: 'pointer', userSelect: 'none',
-    }}>
-      <input
-        type="checkbox"
-        checked={item.is_checked}
-        onChange={(e) => onToggle(item.id, e.target.checked)}
-        style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)', flexShrink: 0 }}
-      />
-      <span style={{
-        flex: 1, fontSize: '14px',
-        color: item.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
-        textDecoration: item.is_checked ? 'line-through' : 'none',
+    <div>
+      <label style={{
+        display: 'flex', alignItems: 'center', gap: '12px',
+        padding: '11px 14px', background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: showSuggestion ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)',
+        borderBottom: showSuggestion ? 'none' : '1px solid var(--color-border)',
+        cursor: 'pointer', userSelect: 'none',
       }}>
-        {qtyLabel && <span style={{ fontWeight: 600, marginRight: '6px' }}>{qtyLabel}</span>}
-        {item.display_name}
-      </span>
-      {item.notes && (
-        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{item.notes}</span>
+        <input
+          type="checkbox"
+          checked={item.is_checked}
+          onChange={(e) => onToggle(item.id, e.target.checked)}
+          style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)', flexShrink: 0 }}
+        />
+        <span style={{
+          flex: 1, fontSize: '14px',
+          color: item.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
+          textDecoration: item.is_checked ? 'line-through' : 'none',
+        }}>
+          {qtyLabel && <span style={{ fontWeight: 600, marginRight: '6px' }}>{qtyLabel}</span>}
+          {item.display_name}
+        </span>
+        {item.in_spice_cabinet && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '3px',
+            fontSize: '11px', fontWeight: 500,
+            color: 'rgba(232, 106, 51, 0.75)',
+            background: 'rgba(232, 106, 51, 0.08)',
+            border: '1px solid rgba(232, 106, 51, 0.2)',
+            borderRadius: 'var(--radius-full)',
+            padding: '2px 8px',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}>
+            🧂 In cabinet
+          </span>
+        )}
+        {!item.in_spice_cabinet && item.notes && (
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{item.notes}</span>
+        )}
+      </label>
+      {showSuggestion && item.spice_cabinet_master_id !== null && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '8px 14px',
+          background: 'rgba(232, 106, 51, 0.05)',
+          border: '1px solid rgba(232, 106, 51, 0.2)',
+          borderTop: 'none',
+          borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+          fontSize: '12px', color: 'var(--color-text-muted)',
+          fontFamily: 'var(--font-sans)',
+        }}>
+          <span style={{ flex: 1 }}>
+            Add <strong style={{ color: 'var(--color-text)' }}>{item.display_name}</strong> to your spice cabinet?
+          </span>
+          <button
+            onClick={() => onAddToCabinet(item.spice_cabinet_master_id!)}
+            style={{
+              background: 'var(--color-primary)',
+              border: 'none', borderRadius: 'var(--radius-sm)',
+              color: '#fff', fontSize: '11px', fontWeight: 600,
+              padding: '3px 9px', cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            + Add
+          </button>
+          <button
+            onClick={() => onDismissSuggestion(item.spice_cabinet_master_id!)}
+            style={{
+              background: 'none', border: 'none',
+              color: 'var(--color-text-muted)', fontSize: '11px',
+              padding: '3px 6px', cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
       )}
-    </label>
+    </div>
   )
 }
 
@@ -279,6 +377,20 @@ export default function GroceryPage() {
   const navigate = useNavigate()
   const [viewMode, setViewMode] = useState<ViewMode>('combined')
   const { confirm, modal: confirmModal } = useConfirm()
+  const { data: myCabinet } = useMySpiceCabinet()
+  const addToCabinet = useAddToSpiceCabinet()
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<number>>(new Set())
+
+  const ownedMasterIds = new Set(myCabinet?.owned ?? [])
+
+  function handleAddToCabinet(masterId: number) {
+    addToCabinet.mutate(masterId)
+    setDismissedSuggestions((prev) => new Set([...prev, masterId]))
+  }
+
+  function handleDismissSuggestion(masterId: number) {
+    setDismissedSuggestions((prev) => new Set([...prev, masterId]))
+  }
 
   if (isLoading) {
     return <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Loading...</div>
@@ -382,6 +494,10 @@ export default function GroceryPage() {
               items={items}
               recipes={recipes}
               onToggleItem={(id, val) => toggleItem.mutate({ id, is_checked: val })}
+              ownedMasterIds={ownedMasterIds}
+              onAddToCabinet={handleAddToCabinet}
+              dismissedSuggestions={dismissedSuggestions}
+              onDismissSuggestion={handleDismissSuggestion}
             />
           )}
           {viewMode === 'by-category' && (
@@ -446,10 +562,18 @@ function ByRecipeView({
   items,
   recipes,
   onToggleItem,
+  ownedMasterIds,
+  onAddToCabinet,
+  dismissedSuggestions,
+  onDismissSuggestion,
 }: {
   items: GroceryItem[]
   recipes: GroceryRecipe[]
   onToggleItem: (id: string, val: boolean) => void
+  ownedMasterIds: Set<number>
+  onAddToCabinet: (masterId: number) => void
+  dismissedSuggestions: Set<number>
+  onDismissSuggestion: (masterId: number) => void
 }) {
   const groups = buildByRecipe(items, recipes)
 
@@ -476,10 +600,26 @@ function ByRecipeView({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {unchecked.map((item) => (
-                <SingleItemRow key={item.id} item={item} onToggle={onToggleItem} />
+                <SingleItemRow
+                  key={item.id}
+                  item={item}
+                  onToggle={onToggleItem}
+                  ownedMasterIds={ownedMasterIds}
+                  onAddToCabinet={onAddToCabinet}
+                  dismissedSuggestions={dismissedSuggestions}
+                  onDismissSuggestion={onDismissSuggestion}
+                />
               ))}
               {checked.map((item) => (
-                <SingleItemRow key={item.id} item={item} onToggle={onToggleItem} />
+                <SingleItemRow
+                  key={item.id}
+                  item={item}
+                  onToggle={onToggleItem}
+                  ownedMasterIds={ownedMasterIds}
+                  onAddToCabinet={onAddToCabinet}
+                  dismissedSuggestions={dismissedSuggestions}
+                  onDismissSuggestion={onDismissSuggestion}
+                />
               ))}
             </div>
           </div>

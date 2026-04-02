@@ -144,13 +144,20 @@ router.get('/', asyncHandler(async (req, res) => {
       [listId]
     ),
     pool.query(
-      `SELECT id, recipe_id, ingredient_id, display_name,
-              quantity::float AS quantity, unit, is_checked,
-              notes, ingredient_key, display_order
-       FROM grocery_list_items
-       WHERE grocery_list_id = $1
-       ORDER BY display_order`,
-      [listId]
+      `SELECT gli.id, gli.recipe_id, gli.ingredient_id, gli.display_name,
+              gli.quantity::float AS quantity, gli.unit, gli.is_checked,
+              gli.notes, gli.ingredient_key, gli.display_order,
+              scm.id AS spice_cabinet_master_id,
+              (usc.master_id IS NOT NULL) AS in_spice_cabinet
+       FROM grocery_list_items gli
+       LEFT JOIN spice_cabinet_master scm ON (
+         lower(scm.name) = lower(gli.display_name)
+         OR similarity(scm.name, gli.display_name) > 0.55
+       )
+       LEFT JOIN user_spice_cabinet usc ON usc.master_id = scm.id AND usc.user_id = $2
+       WHERE gli.grocery_list_id = $1
+       ORDER BY gli.display_order`,
+      [listId, req.user.sub]
     ),
   ])
 

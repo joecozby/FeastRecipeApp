@@ -114,6 +114,104 @@ const DEMO_RECIPE = {
 }
 
 // ---------------------------------------------------------------------------
+// Spice Cabinet Master List (84 items across 7 categories)
+// ---------------------------------------------------------------------------
+
+const SPICE_CABINET_MASTER = [
+  // Baking & Sweeteners
+  { name: 'All-Purpose Flour',        category: 'Baking & Sweeteners',  sort_order: 1 },
+  { name: 'Bread Flour',              category: 'Baking & Sweeteners',  sort_order: 2 },
+  { name: 'Baking Soda',              category: 'Baking & Sweeteners',  sort_order: 3 },
+  { name: 'Baking Powder',            category: 'Baking & Sweeteners',  sort_order: 4 },
+  { name: 'Cornstarch',               category: 'Baking & Sweeteners',  sort_order: 5 },
+  { name: 'Active Dry Yeast',         category: 'Baking & Sweeteners',  sort_order: 6 },
+  { name: 'Cream of Tartar',          category: 'Baking & Sweeteners',  sort_order: 7 },
+  { name: 'Cocoa Powder',             category: 'Baking & Sweeteners',  sort_order: 8 },
+  { name: 'Vanilla Extract',          category: 'Baking & Sweeteners',  sort_order: 9 },
+  { name: 'Granulated Sugar',         category: 'Baking & Sweeteners',  sort_order: 10 },
+  { name: 'Brown Sugar',              category: 'Baking & Sweeteners',  sort_order: 11 },
+  { name: 'Powdered Sugar',           category: 'Baking & Sweeteners',  sort_order: 12 },
+  { name: 'Honey',                    category: 'Baking & Sweeteners',  sort_order: 13 },
+  { name: 'Maple Syrup',              category: 'Baking & Sweeteners',  sort_order: 14 },
+  // Oils & Vinegars
+  { name: 'Olive Oil',                category: 'Oils & Vinegars',      sort_order: 1 },
+  { name: 'Extra Virgin Olive Oil',   category: 'Oils & Vinegars',      sort_order: 2 },
+  { name: 'Vegetable Oil',            category: 'Oils & Vinegars',      sort_order: 3 },
+  { name: 'Coconut Oil',              category: 'Oils & Vinegars',      sort_order: 4 },
+  { name: 'Sesame Oil',               category: 'Oils & Vinegars',      sort_order: 5 },
+  { name: 'Apple Cider Vinegar',      category: 'Oils & Vinegars',      sort_order: 6 },
+  { name: 'White Vinegar',            category: 'Oils & Vinegars',      sort_order: 7 },
+  { name: 'Balsamic Vinegar',         category: 'Oils & Vinegars',      sort_order: 8 },
+  { name: 'Rice Vinegar',             category: 'Oils & Vinegars',      sort_order: 9 },
+  // Spices & Seasonings
+  { name: 'Allspice',                 category: 'Spices & Seasonings',  sort_order: 1 },
+  { name: 'Cardamom',                 category: 'Spices & Seasonings',  sort_order: 2 },
+  { name: 'Cayenne Pepper',           category: 'Spices & Seasonings',  sort_order: 3 },
+  { name: 'Chili Powder',             category: 'Spices & Seasonings',  sort_order: 4 },
+  { name: 'Cinnamon',                 category: 'Spices & Seasonings',  sort_order: 5 },
+  { name: 'Cloves',                   category: 'Spices & Seasonings',  sort_order: 6 },
+  { name: 'Coriander',                category: 'Spices & Seasonings',  sort_order: 7 },
+  { name: 'Cumin',                    category: 'Spices & Seasonings',  sort_order: 8 },
+  { name: 'Curry Powder',             category: 'Spices & Seasonings',  sort_order: 9 },
+  { name: 'Garam Masala',             category: 'Spices & Seasonings',  sort_order: 10 },
+  { name: 'Garlic Powder',            category: 'Spices & Seasonings',  sort_order: 11 },
+  { name: 'Ginger',                   category: 'Spices & Seasonings',  sort_order: 12 },
+  { name: 'Mustard Powder',           category: 'Spices & Seasonings',  sort_order: 13 },
+  { name: 'Nutmeg',                   category: 'Spices & Seasonings',  sort_order: 14 },
+  { name: 'Onion Powder',             category: 'Spices & Seasonings',  sort_order: 15 },
+  { name: 'Paprika',                  category: 'Spices & Seasonings',  sort_order: 16 },
+  { name: 'Smoked Paprika',           category: 'Spices & Seasonings',  sort_order: 17 },
+  { name: 'Red Pepper Flakes',        category: 'Spices & Seasonings',  sort_order: 18 },
+  { name: 'Turmeric',                 category: 'Spices & Seasonings',  sort_order: 19 },
+  { name: 'White Pepper',             category: 'Spices & Seasonings',  sort_order: 20 },
+  { name: 'Black Pepper',             category: 'Spices & Seasonings',  sort_order: 21 },
+  { name: 'Italian Seasoning',        category: 'Spices & Seasonings',  sort_order: 22 },
+  { name: 'Everything Bagel Seasoning', category: 'Spices & Seasonings', sort_order: 23 },
+  { name: 'Old Bay Seasoning',        category: 'Spices & Seasonings',  sort_order: 24 },
+  // Dried Herbs
+  { name: 'Dried Basil',              category: 'Dried Herbs',          sort_order: 1 },
+  { name: 'Bay Leaves',               category: 'Dried Herbs',          sort_order: 2 },
+  { name: 'Dried Dill',               category: 'Dried Herbs',          sort_order: 3 },
+  { name: 'Dried Marjoram',           category: 'Dried Herbs',          sort_order: 4 },
+  { name: 'Dried Mint',               category: 'Dried Herbs',          sort_order: 5 },
+  { name: 'Dried Oregano',            category: 'Dried Herbs',          sort_order: 6 },
+  { name: 'Dried Parsley',            category: 'Dried Herbs',          sort_order: 7 },
+  { name: 'Dried Rosemary',           category: 'Dried Herbs',          sort_order: 8 },
+  { name: 'Dried Sage',               category: 'Dried Herbs',          sort_order: 9 },
+  { name: 'Dried Tarragon',           category: 'Dried Herbs',          sort_order: 10 },
+  { name: 'Dried Thyme',              category: 'Dried Herbs',          sort_order: 11 },
+  { name: 'Dried Chives',             category: 'Dried Herbs',          sort_order: 12 },
+  // Salts
+  { name: 'Table Salt',               category: 'Salts',                sort_order: 1 },
+  { name: 'Kosher Salt',              category: 'Salts',                sort_order: 2 },
+  { name: 'Fine Sea Salt',            category: 'Salts',                sort_order: 3 },
+  { name: 'Flaked Sea Salt',          category: 'Salts',                sort_order: 4 },
+  { name: 'Celery Salt',              category: 'Salts',                sort_order: 5 },
+  // Condiment Staples
+  { name: 'Soy Sauce',                category: 'Condiment Staples',    sort_order: 1 },
+  { name: 'Tamari',                   category: 'Condiment Staples',    sort_order: 2 },
+  { name: 'Worcestershire Sauce',     category: 'Condiment Staples',    sort_order: 3 },
+  { name: 'Fish Sauce',               category: 'Condiment Staples',    sort_order: 4 },
+  { name: 'Hot Sauce',                category: 'Condiment Staples',    sort_order: 5 },
+  { name: 'Dijon Mustard',            category: 'Condiment Staples',    sort_order: 6 },
+  { name: 'Tomato Paste',             category: 'Condiment Staples',    sort_order: 7 },
+  { name: 'Canned Diced Tomatoes',    category: 'Condiment Staples',    sort_order: 8 },
+  { name: 'Chicken Stock',            category: 'Condiment Staples',    sort_order: 9 },
+  { name: 'Vegetable Stock',          category: 'Condiment Staples',    sort_order: 10 },
+  { name: 'Canned Coconut Milk',      category: 'Condiment Staples',    sort_order: 11 },
+  { name: 'Sriracha',                 category: 'Condiment Staples',    sort_order: 12 },
+  // Nuts & Seeds
+  { name: 'Sesame Seeds',             category: 'Nuts & Seeds',         sort_order: 1 },
+  { name: 'Poppy Seeds',              category: 'Nuts & Seeds',         sort_order: 2 },
+  { name: 'Chia Seeds',               category: 'Nuts & Seeds',         sort_order: 3 },
+  { name: 'Flaxseeds',                category: 'Nuts & Seeds',         sort_order: 4 },
+  { name: 'Pine Nuts',                category: 'Nuts & Seeds',         sort_order: 5 },
+  { name: 'Slivered Almonds',         category: 'Nuts & Seeds',         sort_order: 6 },
+  { name: 'Walnuts',                  category: 'Nuts & Seeds',         sort_order: 7 },
+  { name: 'Sunflower Seeds',          category: 'Nuts & Seeds',         sort_order: 8 },
+]
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -303,6 +401,18 @@ async function seed() {
       [userId]
     )
     log('  grocery list ready')
+
+    // ---- Spice cabinet master list -----------------------------------------
+    log('Seeding spice cabinet master list...')
+    for (const item of SPICE_CABINET_MASTER) {
+      await pool.query(
+        `INSERT INTO spice_cabinet_master (name, category, sort_order)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (name) DO NOTHING`,
+        [item.name, item.category, item.sort_order]
+      )
+    }
+    log(`  ${SPICE_CABINET_MASTER.length} spice cabinet items seeded`)
 
     console.log('\nSeed complete.')
     console.log(`  Login: ${DEMO_USER.email} / ${DEMO_USER.password}`)

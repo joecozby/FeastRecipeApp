@@ -8,27 +8,29 @@ import {
   ShoppingCart,
   Sparkles,
   User,
+  FlameKindling,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMobile } from '../../hooks/useMobile'
 
 const NAV_ITEMS = [
-  { to: '/recipes',   label: 'Recipes',   Icon: UtensilsCrossed },
-  { to: '/import',    label: 'Import',    Icon: PlusCircle },
-  { to: '/search',    label: 'Search',    Icon: Search },
-  { to: '/cookbooks', label: 'Cookbooks', Icon: BookOpen },
-  { to: '/grocery',   label: 'Grocery',   Icon: ShoppingCart },
-  { to: '/ai',        label: 'AI Chef',   Icon: Sparkles },
+  { to: '/recipes',       label: 'Recipes',       Icon: UtensilsCrossed },
+  { to: '/import',        label: 'Import',        Icon: PlusCircle },
+  { to: '/search',        label: 'Search',        Icon: Search },
+  { to: '/cookbooks',     label: 'Cookbooks',     Icon: BookOpen },
+  { to: '/grocery',       label: 'Grocery',       Icon: ShoppingCart },
+  { to: '/spice-cabinet', label: 'Spice Cabinet', Icon: FlameKindling },
+  { to: '/ai',            label: 'AI Chef',       Icon: Sparkles },
 ]
 
-// Bottom nav shows 5 key items + Profile; AI Chef is desktop-only until built
+// Bottom nav shows 5 key items + Profile
 const BOTTOM_NAV_ITEMS = [
-  { to: '/recipes',   label: 'Recipes',   Icon: UtensilsCrossed },
-  { to: '/search',    label: 'Search',    Icon: Search },
-  { to: '/import',    label: 'Import',    Icon: PlusCircle },
-  { to: '/grocery',   label: 'Grocery',   Icon: ShoppingCart },
-  { to: '/cookbooks', label: 'Cookbooks', Icon: BookOpen },
-  { to: '/profile',   label: 'Profile',   Icon: User },
+  { to: '/recipes',       label: 'Recipes',  Icon: UtensilsCrossed },
+  { to: '/search',        label: 'Search',   Icon: Search },
+  { to: '/import',        label: 'Import',   Icon: PlusCircle },
+  { to: '/grocery',       label: 'Grocery',  Icon: ShoppingCart },
+  { to: '/spice-cabinet', label: 'Cabinet',  Icon: FlameKindling },
+  { to: '/profile',       label: 'Profile',  Icon: User },
 ]
 
 export function PrivateRoute() {
