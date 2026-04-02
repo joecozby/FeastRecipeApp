@@ -217,7 +217,7 @@ export default function RecipeDetailPage() {
         </div>
       )}
 
-      {/* Title + actions */}
+      {/* Title + management actions */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '12px' }}>
         <div>
           {recipe.status === 'draft' && (
@@ -240,6 +240,21 @@ export default function RecipeDetailPage() {
             {recipe.status === 'published' ? 'Unpublish' : 'Publish'}
           </Button>
         </div>
+      </div>
+
+      {/* Quick actions — visible without scrolling */}
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '16px' }}>
+        <Button onClick={handleAddToGrocery} loading={addToGrocery.isPending} variant="secondary">
+          🛒 Add to Grocery List
+        </Button>
+        <Button variant="secondary" onClick={() => setCookbookModal(true)}>
+          📖 Add to Cookbook
+        </Button>
+        {groceryMsg && (
+          <span style={{ fontSize: '13px', color: '#16a34a', fontFamily: 'var(--font-sans)' }}>
+            {groceryMsg}
+          </span>
+        )}
       </div>
 
       {/* Meta */}
@@ -421,16 +436,9 @@ export default function RecipeDetailPage() {
 
       {/* Bottom actions */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <Button onClick={handleAddToGrocery} loading={addToGrocery.isPending} variant="secondary">
-          🛒 Add to Grocery List
-        </Button>
-        <Button variant="secondary" onClick={() => setCookbookModal(true)}>
-          📖 Add to Cookbook
-        </Button>
         <Button variant="danger" loading={deleteMutation.isPending} onClick={handleDelete}>
-          Delete
+          Delete Recipe
         </Button>
-        {groceryMsg && <span style={{ fontSize: '13px', color: '#16a34a' }}>{groceryMsg}</span>}
       </div>
 
       {recipe.source_url && (
