@@ -23,6 +23,30 @@ router.post(
   asyncHandler(async (req, res) => {
     const { source_type, source_input } = req.body
 
+    // ── Deduplication ───────────────────────────────────────────────────────
+    // For URL and Instagram imports, check whether this user already has a
+    // recipe imported from the same source URL.  If so, skip the entire
+    // pipeline and return the existing recipe immediately.
+    if (source_type === 'url' || source_type === 'instagram') {
+      const { rows: [existing] } = await pool.query(
+        `SELECT id FROM recipes
+         WHERE owner_id = $1 AND source_url = $2 AND deleted_at IS NULL
+         LIMIT 1`,
+        [req.user.sub, source_input]
+      )
+      if (existing) {
+        // Record the attempt as a pre-completed job so history is preserved
+        const { rows: [job] } = await pool.query(
+          `INSERT INTO import_jobs (user_id, source_type, source_input, status, recipe_id)
+           VALUES ($1, $2, $3, 'done', $4)
+           RETURNING id`,
+          [req.user.sub, source_type, source_input, existing.id]
+        )
+        return res.status(202).json({ jobId: job.id, recipe_id: existing.id, duplicate: true })
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     const { rows: [job] } = await pool.query(
       `INSERT INTO import_jobs (user_id, source_type, source_input)
        VALUES ($1, $2, $3)

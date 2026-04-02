@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, FormEvent, ReactNode, DragEvent, ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useImportRecipe, useImportJobStatus } from '../api/recipes'
+import { useImportRecipe, useImportJobStatus, ImportResult } from '../api/recipes'
 import { Button } from '../components/ui/Button'
 import { Input, Textarea } from '../components/ui/Input'
 
@@ -178,12 +178,13 @@ function PhotoDropZone({ dataUrl, onFile, onClear, disabled }: {
 // ---------------------------------------------------------------------------
 export default function ImportPage() {
   const navigate = useNavigate()
-  const [tab, setTab]           = useState<TabId>('url')
-  const [input, setInput]       = useState('')
+  const [tab, setTab]             = useState<TabId>('url')
+  const [input, setInput]         = useState('')
   const [photoData, setPhotoData] = useState('')   // compressed base64 data URL
   const [photoLoading, setPhotoLoading] = useState(false)
-  const [jobId, setJobId]       = useState<string | null>(null)
-  const [error, setError]       = useState('')
+  const [jobId, setJobId]         = useState<string | null>(null)
+  const [duplicate, setDuplicate] = useState<ImportResult | null>(null)
+  const [error, setError]         = useState('')
   const [blockedUrl, setBlockedUrl] = useState<string | null>(null)
 
   const importMutation = useImportRecipe()
@@ -195,7 +196,14 @@ export default function ImportPage() {
 
   const isInstagramBlocked = jobStatus?.error_message === 'INSTAGRAM_BLOCKED'
   const isFailed     = jobStatus?.status === 'failed'
-  const isProcessing = !!jobId && jobStatus?.status !== 'done' && jobStatus?.status !== 'failed'
+  const isProcessing = !!jobId && !duplicate && jobStatus?.status !== 'done' && jobStatus?.status !== 'failed'
+
+  // Auto-navigate to the duplicate recipe after a short delay
+  useEffect(() => {
+    if (!duplicate?.recipe_id) return
+    const timer = setTimeout(() => navigate(`/recipes/${duplicate.recipe_id}`), 2000)
+    return () => clearTimeout(timer)
+  }, [duplicate, navigate])
 
   // Auto-switch to Paste Text when Instagram scraping is blocked
   useEffect(() => {
@@ -235,7 +243,11 @@ export default function ImportPage() {
 
     try {
       const result = await importMutation.mutateAsync({ source_type: tab, source_input: sourceInput })
-      setJobId(result.jobId)
+      if (result.duplicate && result.recipe_id) {
+        setDuplicate(result)
+      } else {
+        setJobId(result.jobId)
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
         ?? 'Import failed. Please try again.'
@@ -244,11 +256,11 @@ export default function ImportPage() {
   }
 
   function handleReset() {
-    setJobId(null); setError(''); setPhotoData(''); importMutation.reset()
+    setJobId(null); setDuplicate(null); setError(''); setPhotoData(''); importMutation.reset()
   }
 
   function switchTab(id: TabId) {
-    setTab(id); setError(''); setJobId(null); setBlockedUrl(null)
+    setTab(id); setError(''); setJobId(null); setDuplicate(null); setBlockedUrl(null)
     if (id !== 'photo') setPhotoData('')
   }
 
@@ -285,6 +297,20 @@ export default function ImportPage() {
         ))}
       </div>
 
+      {duplicate?.recipe_id && (
+        <StatusCard
+          icon="✅"
+          title="Already in your collection"
+          description="You've imported this recipe before. Taking you there now…"
+          color="#16a34a"
+          action={
+            <Button variant="secondary" onClick={() => navigate(`/recipes/${duplicate.recipe_id!}`)}>
+              View Recipe
+            </Button>
+          }
+        />
+      )}
+
       {isProcessing && !isInstagramBlocked && (
         <StatusCard icon="⏳" title="Importing your recipe..."
           description={processingDescription}
@@ -298,7 +324,7 @@ export default function ImportPage() {
           action={<Button variant="secondary" onClick={handleReset}>Try again</Button>} />
       )}
 
-      {!isProcessing && !isFailed && (
+      {!isProcessing && !isFailed && !duplicate && (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {tab === 'url' && (
             <Input label="Recipe URL" type="url" value={input}

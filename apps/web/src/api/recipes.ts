@@ -156,11 +156,18 @@ export function useUploadCoverImage(recipeId: string) {
 // Import
 // ---------------------------------------------------------------------------
 
+export interface ImportResult {
+  jobId: string
+  /** Set when the URL was already imported — navigate here directly. */
+  recipe_id?: string
+  duplicate?: boolean
+}
+
 export function useImportRecipe() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: { source_type: string; source_input: string }) =>
-      client.post('/import', data).then((r) => r.data),
+      client.post('/import', data).then((r) => r.data as ImportResult),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['recipes'] }),
   })
 }
