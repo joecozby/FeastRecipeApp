@@ -1,4 +1,5 @@
 import { NavLink, Outlet, Navigate } from 'react-router-dom'
+import { Suspense } from 'react'
 import {
   UtensilsCrossed,
   PlusCircle,
@@ -163,7 +164,16 @@ function AppShell() {
         padding: isMobile ? '72px 16px 84px' : '32px',
         maxWidth: isMobile ? '100%' : 'calc(var(--content-max) + var(--nav-width))',
       }}>
-        <Outlet />
+        <Suspense fallback={
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            height: '60vh', color: 'var(--color-text-muted)', fontSize: '14px',
+          }}>
+            Loading...
+          </div>
+        }>
+          <Outlet />
+        </Suspense>
       </main>
 
       {/* ── Mobile bottom nav ────────────────────────────── */}
