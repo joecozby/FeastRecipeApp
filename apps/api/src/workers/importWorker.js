@@ -5,7 +5,7 @@ import pool from '../config/db.js'
 import { newRedisConnection } from '../config/redis.js'
 import logger from '../config/logger.js'
 import { scrapeUrl, scrapeInstagram } from '../services/scraper.js'
-import { parseRecipeText } from '../services/aiParser.js'
+import { parseRecipeText, parseRecipeImage } from '../services/aiParser.js'
 import { normalizeIngredient } from '../services/ingredientNormalizer.js'
 import { enqueueNutrition } from './nutritionWorker.js'
 
@@ -24,13 +24,21 @@ async function attachCoverImage(recipeId, ownerId, ...imageUrls) {
 
   for (const imageUrl of candidates) {
     try {
-      logger.debug(`Cover image: trying ${imageUrl}`)
-      const res = await fetch(imageUrl, {
-        signal: AbortSignal.timeout(15000),
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FeastBot/1.0)' },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const buffer = Buffer.from(await res.arrayBuffer())
+      logger.debug(`Cover image: trying ${imageUrl.startsWith('data:') ? '[data URL]' : imageUrl}`)
+      let buffer
+      if (imageUrl.startsWith('data:')) {
+        // Data URL (e.g. from photo import) — decode directly, no fetch needed
+        const base64 = imageUrl.split(',')[1]
+        if (!base64) throw new Error('Invalid data URL')
+        buffer = Buffer.from(base64, 'base64')
+      } else {
+        const res = await fetch(imageUrl, {
+          signal: AbortSignal.timeout(15000),
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FeastBot/1.0)' },
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        buffer = Buffer.from(await res.arrayBuffer())
+      }
 
       const result = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -205,6 +213,15 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
     textToParse = scraped.raw_caption || scraped.description || ''
   }
 
+  // Photo import: send image directly to Claude vision — no scraping, no text parse
+  if (sourceType === 'photo') {
+    logger.info('Import: parsing recipe from photo via vision', { jobId })
+    const parsed = await parseRecipeImage(sourceInput) // sourceInput is the data URL
+    const recipeId = await saveRecipe(userId, parsed, null, { type: 'photo' })
+    // Use the uploaded photo as the cover image
+    return { recipeId, coverImageUrl: sourceInput, ogImage: null }
+  }
+
   // Step 2 — AI parse
   logger.info('Import: calling AI parser', { jobId, sourceType })
   const parsed = await parseRecipeText(textToParse)
@@ -284,7 +301,7 @@ export function startImportWorker() {
       logger.info('Import job complete', { jobId, recipeId })
       enqueueNutrition(recipeId).catch(err => logger.warn(`Failed to enqueue nutrition: ${err.message}`))
       // Pass og_image as fallback — some CDN-hosted recipe images block direct download
-      attachCoverImage(recipeId, userId, coverImageUrl, scraped?.og_image)
+      attachCoverImage(recipeId, userId, coverImageUrl, ogImage)
 
       return { recipeId }
     },

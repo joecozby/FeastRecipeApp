@@ -104,9 +104,11 @@ function extractJsonLd(html) {
 function fromJsonLd(node, sourceUrl) {
   const duration = (iso) => {
     if (!iso) return null
-    const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/)
+    // Handle both PT1H30M and P0DT1H30M (day component present)
+    const m = iso.match(/P(?:\d+D)?T(?:(\d+)H)?(?:(\d+)M)?/)
     if (!m) return null
-    return (parseInt(m[1] || 0) * 60) + parseInt(m[2] || 0)
+    const mins = (parseInt(m[1] || 0) * 60) + parseInt(m[2] || 0)
+    return mins > 0 ? mins : null
   }
 
   const toArray = (v) => {
@@ -154,7 +156,11 @@ function fromJsonLd(node, sourceUrl) {
     cook_time_mins: duration(node.cookTime),
     cuisine: toArray(node.recipeCuisine)[0] || null,
     difficulty: null,
-    tags: toArray(node.recipeCategory).concat(toArray(node.keywords?.split?.(',') ?? [])),
+    tags: toArray(node.recipeCategory).concat(
+      Array.isArray(node.keywords)
+        ? node.keywords
+        : (node.keywords ? String(node.keywords).split(',') : [])
+    ),
     source_url: sourceUrl,
     cover_image_url: node.image
       ? (Array.isArray(node.image) ? node.image[0]?.url ?? node.image[0] : node.image?.url ?? node.image)

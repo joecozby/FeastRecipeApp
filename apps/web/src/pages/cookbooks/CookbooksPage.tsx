@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, FormEvent } from 'react'
+import { useState, useEffect, useRef, FormEvent, CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   useCookbooks, useCreateCookbook, useDeleteCookbook, useReorderCookbooks,
@@ -15,6 +15,62 @@ function reorder<T>(list: T[], fromIdx: number, toIdx: number): T[] {
   const [moved] = next.splice(fromIdx, 1)
   next.splice(toIdx, 0, moved)
   return next
+}
+
+// ---------------------------------------------------------------------------
+// Collage cover — shows 1-4 recipe cover photos in a grid
+// ---------------------------------------------------------------------------
+function CookbookCollage({ photos, height = 140 }: { photos: string[]; height?: number }) {
+  const n = Math.min(photos.length, 4)
+
+  // No recipe photos — fall back to orange gradient placeholder
+  if (n === 0) {
+    return (
+      <div style={{
+        height,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
+        fontSize: '48px',
+      }}>
+        📖
+      </div>
+    )
+  }
+
+  // Grid layout per photo count:
+  //   1 → full bleed
+  //   2 → two columns side by side
+  //   3 → large left + two stacked right
+  //   4 → 2 × 2
+  const gridStyle: CSSProperties = {
+    height,
+    display: 'grid',
+    gap: '2px',
+    overflow: 'hidden',
+    gridTemplateColumns: n === 1 ? '1fr' : '1fr 1fr',
+    gridTemplateRows: n <= 2 ? '1fr' : '1fr 1fr',
+  }
+
+  return (
+    <div style={gridStyle}>
+      {photos.slice(0, n).map((url, i) => (
+        <img
+          key={i}
+          src={url}
+          alt=""
+          draggable={false}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+            // For 3-photo layout the first image spans both rows on the left
+            gridRow: n === 3 && i === 0 ? '1 / 3' : undefined,
+          }}
+        />
+      ))}
+    </div>
+  )
 }
 
 function CookbookCard({
@@ -62,23 +118,7 @@ function CookbookCard({
         userSelect: 'none',
       }}
     >
-      {cookbook.cover_url ? (
-        <img
-          src={cookbook.cover_url}
-          alt={cookbook.title}
-          style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }}
-          draggable={false}
-        />
-      ) : (
-        <div style={{
-          height: '140px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
-          fontSize: '48px',
-        }}>
-          📖
-        </div>
-      )}
+      <CookbookCollage photos={cookbook.cover_photos ?? []} />
 
       <div style={{ padding: '14px 16px 16px' }}>
         <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>{cookbook.title}</h3>

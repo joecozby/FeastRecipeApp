@@ -136,7 +136,7 @@ function isOverloaded(err) {
   return err?.status === 529 || err?.message?.includes('overloaded') || err?.message?.includes('529')
 }
 
-async function callClaude(text) {
+async function callClaude(messages) {
   const { default: Anthropic } = await import('@anthropic-ai/sdk')
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -147,7 +147,7 @@ async function callClaude(text) {
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: `Parse this recipe:\n\n${text}` }],
+        messages,
       })
 
       const content = message.content[0]
@@ -237,11 +237,54 @@ export async function parseRecipeText(text) {
 
   try {
     logger.debug('Calling Claude to parse recipe text')
-    const parsed = await callClaude(text)
+    const parsed = await callClaude([
+      { role: 'user', content: `Parse this recipe:\n\n${text}` },
+    ])
     logger.debug('Claude parse complete', { title: parsed.title })
     return sanitizeParsed(parsed)
   } catch (err) {
     logger.error('Claude API call failed', { error: err.message })
     throw new Error(`AI parsing failed: ${err.message}`)
+  }
+}
+
+/**
+ * Parse a recipe from an image (photo of a recipe book, handwritten card, screenshot, etc.).
+ *
+ * @param {string} dataUrl  A data URL like "data:image/jpeg;base64,/9j/..."
+ */
+export async function parseRecipeImage(dataUrl) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    logger.warn('ANTHROPIC_API_KEY not set — returning stub AI response for image')
+    return STUB_RESPONSE
+  }
+
+  // Parse data URL → media_type + raw base64
+  const match = dataUrl.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/s)
+  if (!match) throw new Error('Invalid image data URL — expected data:image/jpeg|png|webp|gif;base64,...')
+  const [, mediaType, base64Data] = match
+
+  try {
+    logger.debug('Calling Claude vision to parse recipe image')
+    const parsed = await callClaude([
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: base64Data },
+          },
+          {
+            type: 'text',
+            text: 'Parse this recipe from the image. Extract all visible ingredients and instructions exactly as written.',
+          },
+        ],
+      },
+    ])
+    logger.debug('Claude vision parse complete', { title: parsed.title })
+    return sanitizeParsed(parsed)
+  } catch (err) {
+    logger.error('Claude vision API call failed', { error: err.message })
+    throw new Error(`AI image parsing failed: ${err.message}`)
   }
 }

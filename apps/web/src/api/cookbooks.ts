@@ -6,6 +6,7 @@ export interface CookbookSummary {
   title: string
   description: string | null
   cover_url: string | null
+  cover_photos: string[]   // up to 4 cover URLs from the first recipes in the cookbook
   recipe_count: number
   display_order: number
   created_at: string

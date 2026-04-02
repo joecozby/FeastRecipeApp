@@ -20,11 +20,22 @@ async function getCookbookOrThrow(id, userId) {
 // GET /api/cookbooks
 router.get('/', asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, title, description, cover_url, display_order, created_at, updated_at,
-            (SELECT count(*) FROM cookbook_recipes cr WHERE cr.cookbook_id = c.id) AS recipe_count
+    `SELECT c.id, c.title, c.description, c.cover_url, c.display_order, c.created_at, c.updated_at,
+            (SELECT count(*) FROM cookbook_recipes cr WHERE cr.cookbook_id = c.id) AS recipe_count,
+            ARRAY(
+              SELECT m.url
+              FROM cookbook_recipes cr
+              JOIN recipes r ON r.id = cr.recipe_id
+              LEFT JOIN media_assets m ON m.id = r.cover_media_id
+              WHERE cr.cookbook_id = c.id
+                AND r.deleted_at IS NULL
+                AND m.url IS NOT NULL
+              ORDER BY cr.display_order ASC, cr.added_at ASC
+              LIMIT 4
+            ) AS cover_photos
      FROM cookbooks c
-     WHERE owner_id = $1 AND deleted_at IS NULL
-     ORDER BY display_order ASC, created_at ASC`,
+     WHERE c.owner_id = $1 AND c.deleted_at IS NULL
+     ORDER BY c.display_order ASC, c.created_at ASC`,
     [req.user.sub]
   )
   res.json(rows)

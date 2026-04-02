@@ -16,7 +16,7 @@ const importQueue = new Queue('import', { connection: newRedisConnection() })
 router.post(
   '/',
   [
-    body('source_type').isIn(['url', 'instagram', 'text', 'manual']),
+    body('source_type').isIn(['url', 'instagram', 'text', 'manual', 'photo']),
     body('source_input').notEmpty().withMessage('source_input is required'),
     validate,
   ],
