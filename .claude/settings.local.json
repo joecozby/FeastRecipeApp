@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Read(//c/Users/joewc/FeastRecipeApp/**)",
+      "Bash(done)",
+      "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(48\\).toString\\(''hex''\\)\\)\")",
+      "Bash(npm install:*)",
+      "Bash(git -C \"C:/Users/joewc/FeastRecipeApp\" add apps/api/src/services/ingredientNormalizer.js apps/api/src/modules/recipes/index.js)",
+      "Bash(git -C:*)",
+      "Bash(inkscape --version)",
+      "Bash(convert --version)",
+      "Bash(magick --version)",
+      "Bash(node -e \"require\\(''sharp''\\)\")",
+      "Bash(node -e \"require\\(''canvas''\\)\")",
+      "Bash(node -e \":*)",
+      "WebFetch(domain:3000-inceoionu4z5vcyi3ebn5-4db0f39d.us2.manus.computer)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(gh repo:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

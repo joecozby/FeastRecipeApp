@@ -15,9 +15,18 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
       padding: '64px 24px', gap: '12px',
     }}>
       {icon && <span style={{ fontSize: '48px', lineHeight: 1 }}>{icon}</span>}
-      <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text)' }}>{title}</h3>
+      <h3 style={{
+        fontSize: '20px', fontWeight: 600,
+        fontFamily: 'var(--font-display)',
+        color: 'var(--color-text)',
+      }}>
+        {title}
+      </h3>
       {description && (
-        <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', maxWidth: '360px' }}>
+        <p style={{
+          fontSize: '14px', color: 'var(--color-text-muted)',
+          maxWidth: '360px', fontFamily: 'var(--font-sans)', lineHeight: 1.6,
+        }}>
           {description}
         </p>
       )}

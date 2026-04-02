@@ -72,7 +72,7 @@ function CookbookCard({
         <div style={{
           height: '140px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'linear-gradient(135deg, var(--color-primary) 0%, #c4501e 100%)',
+          background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
           fontSize: '48px',
         }}>
           📖

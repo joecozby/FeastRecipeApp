@@ -1,15 +1,30 @@
 import { InputHTMLAttributes, TextareaHTMLAttributes, forwardRef } from 'react'
 
-const inputStyle: React.CSSProperties = {
+const baseInputStyle: React.CSSProperties = {
   width: '100%',
-  padding: '8px 12px',
-  fontSize: '14px',
+  padding: '10px 14px',
+  fontSize: '15px',
   border: '1px solid var(--color-border)',
   borderRadius: 'var(--radius-md)',
-  background: 'var(--color-surface)',
+  background: 'var(--color-input-bg)',
   color: 'var(--color-text)',
   outline: 'none',
-  transition: 'border-color 0.15s',
+  transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
+  fontFamily: 'var(--font-sans)',
+}
+
+const labelStyle: React.CSSProperties = {
+  fontSize: '13px',
+  fontWeight: 600,
+  color: 'var(--color-text)',
+  fontFamily: 'var(--font-sans)',
+  letterSpacing: '0.01em',
+}
+
+const errorStyle: React.CSSProperties = {
+  fontSize: '12px',
+  color: 'var(--color-hard)',
+  fontWeight: 500,
   fontFamily: 'var(--font-sans)',
 }
 
@@ -20,22 +35,18 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, style, ...props }, ref) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      {label && (
-        <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text)' }}>
-          {label}
-        </label>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+      {label && <label style={labelStyle}>{label}</label>}
       <input
         ref={ref}
         style={{
-          ...inputStyle,
-          borderColor: error ? '#dc2626' : 'var(--color-border)',
+          ...baseInputStyle,
+          borderColor: error ? 'var(--color-hard)' : 'var(--color-border)',
           ...style,
         }}
         {...props}
       />
-      {error && <span style={{ fontSize: '12px', color: '#dc2626' }}>{error}</span>}
+      {error && <span style={errorStyle}>{error}</span>}
     </div>
   )
 )
@@ -48,24 +59,20 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ label, error, style, ...props }, ref) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      {label && (
-        <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text)' }}>
-          {label}
-        </label>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+      {label && <label style={labelStyle}>{label}</label>}
       <textarea
         ref={ref}
         style={{
-          ...inputStyle,
+          ...baseInputStyle,
           resize: 'vertical',
-          minHeight: '80px',
-          borderColor: error ? '#dc2626' : 'var(--color-border)',
+          minHeight: '90px',
+          borderColor: error ? 'var(--color-hard)' : 'var(--color-border)',
           ...style,
         }}
         {...props}
       />
-      {error && <span style={{ fontSize: '12px', color: '#dc2626' }}>{error}</span>}
+      {error && <span style={errorStyle}>{error}</span>}
     </div>
   )
 )

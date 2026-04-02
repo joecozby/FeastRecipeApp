@@ -43,14 +43,14 @@ export default function RecipeListPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: '24px',
       }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700 }}>My Recipes</h1>
+        <h1 style={{ fontSize: '26px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>My Recipes</h1>
         <Button onClick={() => navigate('/import')}>+ Import Recipe</Button>
       </div>
 
       {/* Filter tabs */}
       <div style={{
         display: 'flex', gap: '4px', marginBottom: '24px',
-        background: 'var(--color-border)', padding: '4px',
+        background: 'var(--color-silver)', padding: '4px',
         borderRadius: 'var(--radius-md)', width: 'fit-content',
       }}>
         {FILTER_TABS.map((tab) => (
@@ -59,11 +59,12 @@ export default function RecipeListPage() {
             onClick={() => setStatus(tab.value)}
             style={{
               padding: '6px 16px', borderRadius: 'var(--radius-sm)',
-              border: 'none', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-              background: status === tab.value ? 'var(--color-surface)' : 'transparent',
-              color: status === tab.value ? 'var(--color-text)' : 'var(--color-text-muted)',
+              border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              background: status === tab.value ? 'var(--color-primary)' : 'transparent',
+              color: status === tab.value ? '#fff' : 'var(--color-text-muted)',
               boxShadow: status === tab.value ? 'var(--shadow-sm)' : 'none',
-              transition: 'all 0.15s',
+              transition: 'all 0.15s var(--ease-out)',
             }}
           >
             {tab.label}

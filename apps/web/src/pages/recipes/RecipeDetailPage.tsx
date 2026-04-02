@@ -77,10 +77,10 @@ function groupBy<T>(items: T[], key: (item: T) => string | null): [string | null
   return Array.from(map.entries())
 }
 
-const DIFFICULTY_COLOR: Record<string, string> = {
-  easy: '#16a34a',
-  medium: '#d97706',
-  hard: '#dc2626',
+const DIFFICULTY_STYLE: Record<string, { bg: string; color: string }> = {
+  easy:   { bg: 'var(--color-easy-bg)',   color: 'var(--color-easy)'   },
+  medium: { bg: 'var(--color-medium-bg)', color: 'var(--color-medium)' },
+  hard:   { bg: 'var(--color-hard-bg)',   color: 'var(--color-hard)'   },
 }
 
 function formatTime(mins: number): string {
@@ -151,9 +151,11 @@ export default function RecipeDetailPage() {
       ) : (
         <div style={{
           width: '100%', height: '220px', borderRadius: 'var(--radius-xl)', marginBottom: '24px',
-          background: 'linear-gradient(135deg, var(--color-primary) 0%, #c4501e 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '64px',
-        }}>🍽</div>
+          background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <img src="/logo.svg" alt="" style={{ height: '100px', opacity: 0.9 }} />
+        </div>
       )}
 
       {/* Title + actions */}
@@ -164,7 +166,7 @@ export default function RecipeDetailPage() {
               DRAFT
             </span>
           )}
-          <h1 style={{ fontSize: '28px', fontWeight: 700, lineHeight: 1.2 }}>{recipe.title}</h1>
+          <h1 style={{ fontSize: '30px', fontWeight: 700, lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>{recipe.title}</h1>
           {recipe.owner_name && (
             <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '4px' }}>by {recipe.owner_name}</p>
           )}
@@ -186,8 +188,14 @@ export default function RecipeDetailPage() {
         {recipe.cuisine && (
           <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>🌍 {recipe.cuisine}</span>
         )}
-        {recipe.difficulty && (
-          <span style={{ fontSize: '13px', color: DIFFICULTY_COLOR[recipe.difficulty] ?? 'var(--color-text-muted)', fontWeight: 500 }}>
+        {recipe.difficulty && DIFFICULTY_STYLE[recipe.difficulty] && (
+          <span style={{
+            fontSize: '12px', fontWeight: 700,
+            color: DIFFICULTY_STYLE[recipe.difficulty].color,
+            background: DIFFICULTY_STYLE[recipe.difficulty].bg,
+            padding: '3px 10px', borderRadius: 'var(--radius-full)',
+            fontFamily: 'var(--font-sans)',
+          }}>
             {recipe.difficulty.charAt(0).toUpperCase() + recipe.difficulty.slice(1)}
           </span>
         )}

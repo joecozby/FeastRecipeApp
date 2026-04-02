@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 300" width="500" height="300">
+
+  <!-- FORK -->
+  <!-- Three tines (rounded rectangles) -->
+  <rect x="44" y="22" width="11" height="64" rx="5.5" fill="#1a1a1a"/>
+  <rect x="63" y="22" width="11" height="64" rx="5.5" fill="#1a1a1a"/>
+  <rect x="82" y="22" width="11" height="64" rx="5.5" fill="#1a1a1a"/>
+  <!-- Solid connector block ties tines together -->
+  <rect x="44" y="72" width="49" height="22" fill="#1a1a1a"/>
+  <!-- Neck: tapers from connector width down to handle width -->
+  <polygon points="44,92 63,112 76,112 93,92" fill="#1a1a1a"/>
+  <!-- Handle -->
+  <rect x="63" y="111" width="13" height="163" rx="6.5" fill="#1a1a1a"/>
+
+  <!-- PLATE -->
+  <circle cx="255" cy="150" r="118" fill="#1a1a1a"/>
+  <!-- Inner ring gap (white creates the ring illusion) -->
+  <circle cx="255" cy="150" r="97" fill="none" stroke="white" stroke-width="15"/>
+
+  <!-- KNIFE -->
+  <!-- Blade: straight spine on left, gently curved cutting edge on right -->
+  <path d="M415,22 L447,22 Q455,62 444,102 L415,102 Z" fill="#1a1a1a"/>
+  <!-- Handle -->
+  <rect x="415" y="101" width="16" height="163" rx="8" fill="#1a1a1a"/>
+
+</svg>

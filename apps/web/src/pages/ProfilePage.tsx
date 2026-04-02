@@ -80,7 +80,7 @@ export default function ProfilePage() {
       }}>
         <div style={{
           width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0,
-          background: 'linear-gradient(135deg, var(--color-primary) 0%, #c4501e 100%)',
+          background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '26px', color: '#fff', fontWeight: 700,
         }}>

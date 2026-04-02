@@ -1,30 +1,66 @@
-/* Design tokens */
+/* ============================================================
+   FEAST DESIGN SYSTEM — Global Tokens & Base Styles
+   Direction: Warm Modernism
+   Fonts:  Fraunces (display) · Plus Jakarta Sans (UI) · Fira Code (mono)
+   ============================================================ */
+
 :root {
-  --color-bg:             #FAFAF8;
-  --color-surface:        #FFFFFF;
-  --color-border:         #EBEBEB;
-  --color-text:           #1A1A1A;
-  --color-text-muted:     #888888;
-  --color-primary:        #E8622A;
-  --color-primary-hover:  #D4531C;
-  --color-primary-light:  #FEF0E9;
+  /* ── Brand Colors ─────────────────────────────────────── */
+  --color-primary:        #E86A33;   /* Feast Orange — CTAs, active states, brand accent */
+  --color-primary-hover:  #D45E28;   /* Darker orange for hover/press */
+  --color-primary-light:  #FDF3F0;   /* Soft Peach — active nav tint, hover bg */
 
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
+  /* ── Surface Colors ───────────────────────────────────── */
+  --color-bg:             #FDFAF7;   /* Warm Cream — primary app background */
+  --color-surface:        #FFFFFF;   /* Card / panel / modal background */
+  --color-silver:         #F8F9FA;   /* Input bg, tab container, dividers */
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  /* ── Text Colors ──────────────────────────────────────── */
+  --color-text:           #2D3142;   /* Charcoal — primary text, headings */
+  --color-text-muted:     #6C757D;   /* Slate Gray — secondary text, placeholders */
 
-  --nav-width:    240px;
-  --content-max:  1100px;
+  /* ── Semantic UI ──────────────────────────────────────── */
+  --color-border:         #E8E8E8;
+  --color-input-bg:       #F8F9FA;
 
-  --font-sans: 'Inter', system-ui, sans-serif;
+  /* ── Difficulty / Semantic Status ────────────────────── */
+  --color-easy:           #4CAF50;
+  --color-easy-bg:        #E8F5E9;
+  --color-medium:         #F9A825;
+  --color-medium-bg:      #FFF8E1;
+  --color-hard:           #DC3545;
+  --color-hard-bg:        #FFEBEE;
+
+  /* ── Border Radius ────────────────────────────────────── */
+  --radius-sm:   8px;      /* buttons, small chips */
+  --radius-md:   12px;     /* inputs, cards, modals */
+  --radius-lg:   16px;     /* large cards, panels */
+  --radius-xl:   24px;     /* sheets, overlays */
+  --radius-full: 9999px;   /* pills, avatars */
+
+  /* ── Shadows ──────────────────────────────────────────── */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:  0 4px 20px rgba(0,0,0,0.07);
+  --shadow-lg:  0 8px 30px rgba(0,0,0,0.12);
+  --shadow-xl:  0 16px 48px rgba(0,0,0,0.16);
+
+  /* ── Animation Easing ─────────────────────────────────── */
+  --ease-out:    cubic-bezier(0, 0, 0.2, 1);       /* page transitions, cards appearing */
+  --ease-in:     cubic-bezier(0.4, 0, 1, 1);       /* exits, dismissals */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);     /* sidebar, tab switching */
+  --spring:      cubic-bezier(0.34, 1.56, 0.64, 1);/* checkbox, button press, success */
+
+  /* ── Layout ───────────────────────────────────────────── */
+  --nav-width:   240px;
+  --content-max: 1100px;
+
+  /* ── Typography ───────────────────────────────────────── */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans:    'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono:    'Fira Code', 'Courier New', monospace;
 }
 
-/* Reset */
+/* ── Reset ────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -34,6 +70,7 @@
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -56,4 +93,72 @@ button {
 img {
   display: block;
   max-width: 100%;
+}
+
+/* ── Focus ring (keyboard nav) ─────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Input / Textarea focus (overrides inline styles via !important) ── */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-primary) !important;
+  background: var(--color-surface) !important;
+  box-shadow: 0 0 0 3px rgba(232, 106, 51, 0.12) !important;
+}
+
+/* ── Scroll reveal animation ───────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 500ms var(--ease-out),
+              transform 500ms var(--ease-out);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Typography helpers ────────────────────────────────────── */
+.font-display { font-family: var(--font-display); }
+.font-sans    { font-family: var(--font-sans); }
+.font-mono    { font-family: var(--font-mono); }
+
+/* ── Mobile responsive overrides ──────────────────────────── */
+@media (max-width: 768px) {
+  /* Recipe / cookbook grids: tighter min so 2 columns fit on phone */
+  .recipe-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  /* Skeleton cards */
+  .skeleton-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  /* Recipe detail: full width, reduced padding */
+  .recipe-detail {
+    max-width: 100% !important;
+  }
+
+  /* Modals: full screen on mobile */
+  .modal-panel {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+    margin-top: auto !important;
+  }
+
+  /* Tab selectors: smaller padding */
+  .tab-selector button {
+    padding: 5px 12px !important;
+    font-size: 12px !important;
+  }
 }
