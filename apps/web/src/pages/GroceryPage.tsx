@@ -10,6 +10,7 @@ import {
 import { EmptyState } from '../components/ui/EmptyState'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
+import { useConfirm } from '../components/ui/ConfirmModal'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -277,6 +278,7 @@ export default function GroceryPage() {
   const toggleGroup = useToggleIngredientGroup()
   const navigate = useNavigate()
   const [viewMode, setViewMode] = useState<ViewMode>('combined')
+  const { confirm, modal: confirmModal } = useConfirm()
 
   if (isLoading) {
     return <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Loading...</div>
@@ -337,7 +339,13 @@ export default function GroceryPage() {
                 </button>
                 <button
                   onClick={async () => {
-                    if (!confirm(`Remove "${r.title}" from your grocery list?`)) return
+                    const ok = await confirm({
+                      title: 'Remove from Grocery List',
+                      message: `Remove "${r.title}" from your grocery list?`,
+                      confirmLabel: 'Remove',
+                      variant: 'danger',
+                    })
+                    if (!ok) return
                     await removeRecipe.mutateAsync(r.recipe_id)
                   }}
                   style={{
@@ -384,6 +392,7 @@ export default function GroceryPage() {
           )}
         </>
       )}
+      {confirmModal}
     </div>
   )
 }

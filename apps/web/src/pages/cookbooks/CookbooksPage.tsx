@@ -7,6 +7,7 @@ import {
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
+import { useConfirm } from '../../components/ui/ConfirmModal'
 import { EmptyState } from '../../components/ui/EmptyState'
 
 function reorder<T>(list: T[], fromIdx: number, toIdx: number): T[] {
@@ -116,6 +117,7 @@ export default function CookbooksPage() {
   const deleteMutation = useDeleteCookbook()
   const reorderMutation = useReorderCookbooks()
 
+  const { confirm, modal: confirmModal } = useConfirm()
   const [localCookbooks, setLocalCookbooks] = useState<CookbookSummary[]>([])
   const draggingId = useRef<string | null>(null)
 
@@ -163,7 +165,13 @@ export default function CookbooksPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this cookbook? Recipes inside will not be deleted.')) return
+    const ok = await confirm({
+      title: 'Delete Cookbook',
+      message: 'Delete this cookbook? Recipes inside will not be deleted.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    })
+    if (!ok) return
     await deleteMutation.mutateAsync(id)
   }
 
@@ -217,6 +225,7 @@ export default function CookbooksPage() {
           </div>
         </form>
       </Modal>
+      {confirmModal}
     </div>
   )
 }

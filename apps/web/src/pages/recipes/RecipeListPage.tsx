@@ -5,6 +5,7 @@ import { RecipeCard } from '../../components/ui/RecipeCard'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useFilterState } from '../../hooks/useFilterState'
+import { useMobile } from '../../hooks/useMobile'
 
 type StatusFilter = 'all' | 'published' | 'draft'
 
@@ -16,6 +17,7 @@ const FILTER_TABS: { value: StatusFilter; label: string }[] = [
 
 export default function RecipeListPage() {
   const navigate = useNavigate()
+  const isMobile = useMobile()
   const [status, setStatus] = useFilterState<StatusFilter>('status', 'all')
 
   const queryParams = status === 'all' ? {} : { status }
@@ -43,8 +45,8 @@ export default function RecipeListPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: '24px',
       }}>
-        <h1 style={{ fontSize: '26px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>My Recipes</h1>
-        <Button onClick={() => navigate('/import')}>+ Import Recipe</Button>
+        <h1 style={{ fontSize: isMobile ? '22px' : '26px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>My Recipes</h1>
+        {!isMobile && <Button onClick={() => navigate('/import')}>+ Import Recipe</Button>}
       </div>
 
       {/* Filter tabs */}

@@ -8,6 +8,7 @@ import { RecipeCard } from '../../components/ui/RecipeCard'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
+import { useConfirm } from '../../components/ui/ConfirmModal'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { RecipeSummary } from '../../api/recipes'
 
@@ -25,6 +26,7 @@ export default function CookbookDetailPage() {
   const removeRecipe = useRemoveRecipeFromCookbook()
   const reorderRecipes = useReorderCookbookRecipes(id!)
 
+  const { confirm, modal: confirmModal } = useConfirm()
   const [localRecipes, setLocalRecipes] = useState<RecipeSummary[]>([])
   const draggingId = useRef<string | null>(null)
 
@@ -55,7 +57,13 @@ export default function CookbookDetailPage() {
   }
 
   async function handleRemove(recipeId: string) {
-    if (!confirm('Remove this recipe from the cookbook?')) return
+    const ok = await confirm({
+      title: 'Remove Recipe',
+      message: 'Remove this recipe from the cookbook?',
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    })
+    if (!ok) return
     await removeRecipe.mutateAsync({ cookbookId: id!, recipeId })
   }
 
@@ -168,6 +176,7 @@ export default function CookbookDetailPage() {
           </div>
         </form>
       </Modal>
+      {confirmModal}
     </div>
   )
 }

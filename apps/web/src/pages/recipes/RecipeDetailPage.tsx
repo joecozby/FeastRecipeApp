@@ -5,6 +5,7 @@ import { useCookbooks, useAddRecipeToCookbook } from '../../api/cookbooks'
 import { useAddRecipeToGrocery } from '../../api/grocery'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
+import { useConfirm } from '../../components/ui/ConfirmModal'
 
 function formatQty(n: number): string {
   if (n === Math.round(n)) return String(Math.round(n))
@@ -101,6 +102,7 @@ export default function RecipeDetailPage() {
   const addToCookbook = useAddRecipeToCookbook()
   const { data: cookbooks } = useCookbooks()
 
+  const { confirm, modal: confirmModal } = useConfirm()
   const [servings, setServings] = useState<number | null>(null)
   const [unitSystem, setUnitSystem] = useState<'original' | 'metric' | 'us'>('original')
   const [cookbookModal, setCookbookModal] = useState(false)
@@ -122,7 +124,13 @@ export default function RecipeDetailPage() {
   const instructionGroups = groupBy(recipe.instructions ?? [], (i: Instruction) => i.group_label)
 
   async function handleDelete() {
-    if (!confirm('Delete this recipe? This cannot be undone.')) return
+    const ok = await confirm({
+      title: 'Delete Recipe',
+      message: 'Delete this recipe? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    })
+    if (!ok) return
     await deleteMutation.mutateAsync(id!)
     navigate('/recipes')
   }
@@ -412,6 +420,7 @@ export default function RecipeDetailPage() {
           </div>
         )}
       </Modal>
+      {confirmModal}
     </div>
   )
 }
