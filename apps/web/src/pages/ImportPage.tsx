@@ -280,19 +280,22 @@ export default function ImportPage() {
       <div style={{
         display: 'flex', gap: '4px', marginBottom: '28px',
         background: 'var(--color-border)', padding: '4px',
-        borderRadius: 'var(--radius-md)', width: 'fit-content',
+        borderRadius: 'var(--radius-md)', width: '100%',
       }}>
         {TABS.map((t) => (
           <button key={t.id} onClick={() => switchTab(t.id)} style={{
-            padding: '7px 18px', borderRadius: 'var(--radius-sm)', border: 'none',
+            flex: 1, minWidth: 0,
+            padding: '7px 4px', borderRadius: 'var(--radius-sm)', border: 'none',
             fontSize: '13px', fontWeight: 500, cursor: 'pointer',
             background: tab === t.id ? 'var(--color-surface)' : 'transparent',
             color: tab === t.id ? 'var(--color-text)' : 'var(--color-text-muted)',
             boxShadow: tab === t.id ? 'var(--shadow-sm)' : 'none',
-            transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '6px',
-            fontFamily: 'var(--font-sans)',
+            transition: 'all 0.15s', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: '5px',
+            fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', overflow: 'hidden',
           }}>
-            <span>{t.icon}</span>{t.label}
+            <span style={{ flexShrink: 0 }}>{t.icon}</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.label}</span>
           </button>
         ))}
       </div>
