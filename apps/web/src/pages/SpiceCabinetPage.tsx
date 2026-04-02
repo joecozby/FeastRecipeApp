@@ -25,27 +25,30 @@ function SpicePill({
 }) {
   const [hovered, setHovered] = useState(false)
 
-  const baseStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '5px',
-    padding: '6px 13px',
-    borderRadius: 'var(--radius-full)',
-    fontSize: '13px',
-    fontWeight: 500,
-    cursor: disabled ? 'default' : 'pointer',
-    border: owned ? 'none' : '1px solid var(--color-border)',
-    background: owned
-      ? 'var(--color-primary)'
-      : hovered && !disabled
-      ? 'var(--color-surface)'
-      : 'transparent',
-    color: owned ? '#fff' : hovered && !disabled ? 'var(--color-text)' : 'var(--color-text-muted)',
-    transition: 'background 0.13s, color 0.13s, border-color 0.13s',
-    userSelect: 'none',
-    fontFamily: 'var(--font-sans)',
-    opacity: disabled ? 0.6 : 1,
-  }
+  // Owned: solid orange. Unowned: dashed-border with visible + so it's
+  // obviously an "add" action, brightens to light-orange on hover.
+  const baseStyle: React.CSSProperties = owned
+    ? {
+        display: 'inline-flex', alignItems: 'center', gap: '5px',
+        padding: '6px 13px', borderRadius: 'var(--radius-full)',
+        fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+        border: '1.5px solid var(--color-primary)',
+        background: 'var(--color-primary)', color: '#fff',
+        transition: 'opacity 0.12s', opacity: disabled ? 0.6 : 1,
+        userSelect: 'none', fontFamily: 'var(--font-sans)',
+      }
+    : {
+        display: 'inline-flex', alignItems: 'center', gap: '4px',
+        padding: '6px 12px 6px 9px', borderRadius: 'var(--radius-full)',
+        fontSize: '13px', fontWeight: 500, cursor: disabled ? 'default' : 'pointer',
+        border: '1.5px dashed',
+        borderColor: hovered ? 'var(--color-primary)' : 'var(--color-border)',
+        background: hovered ? 'rgba(232,106,51,0.07)' : 'transparent',
+        color: hovered ? 'var(--color-primary)' : 'var(--color-text-muted)',
+        transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+        userSelect: 'none', fontFamily: 'var(--font-sans)',
+        opacity: disabled ? 0.6 : 1,
+      }
 
   return (
     <button
@@ -56,9 +59,11 @@ function SpicePill({
       onMouseLeave={() => setHovered(false)}
       title={owned ? `Remove ${item.name} from cabinet` : `Add ${item.name} to cabinet`}
     >
-      {owned && (
-        <span style={{ fontSize: '11px', lineHeight: 1 }}>✓</span>
-      )}
+      {owned
+        ? <span style={{ fontSize: '11px', lineHeight: 1 }}>✓</span>
+        : <span style={{ fontSize: '14px', lineHeight: 1, fontWeight: 700,
+                         color: hovered ? 'var(--color-primary)' : 'var(--color-border)' }}>+</span>
+      }
       {item.name}
     </button>
   )
@@ -241,7 +246,7 @@ export default function SpiceCabinetPage() {
           Spice Cabinet
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: 0 }}>
-          Track what you have on hand. Marked items show up as "In cabinet" on your grocery list.
+          Tap any item to add it to your cabinet. Marked items show up as "In cabinet" on your grocery list.
         </p>
       </div>
 
@@ -270,7 +275,7 @@ export default function SpiceCabinetPage() {
       )}
 
       {/* Search bar */}
-      <div style={{ marginBottom: '4px' }}>
+      <div style={{ marginBottom: '12px' }}>
         <input
           type="search"
           placeholder="Search spices and staples..."
@@ -289,6 +294,33 @@ export default function SpiceCabinetPage() {
             boxSizing: 'border-box',
           }}
         />
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: '16px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '4px',
+              padding: '3px 10px 3px 7px', borderRadius: 'var(--radius-full)',
+              fontSize: '12px', fontWeight: 600,
+              background: 'var(--color-primary)', color: '#fff',
+              border: '1.5px solid var(--color-primary)',
+            }}>
+              <span style={{ fontSize: '10px' }}>✓</span> In cabinet
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>tap to remove</span>
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '4px',
+              padding: '3px 10px 3px 7px', borderRadius: 'var(--radius-full)',
+              fontSize: '12px', fontWeight: 500,
+              background: 'transparent', color: 'var(--color-text-muted)',
+              border: '1.5px dashed var(--color-border)',
+            }}>
+              <span style={{ fontSize: '13px', fontWeight: 700 }}>+</span> Not yet added
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>tap to add</span>
+          </div>
+        </div>
       </div>
 
       {/* Loading state */}
