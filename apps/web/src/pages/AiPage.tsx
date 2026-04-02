@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAiChat, ChatMessage } from '../api/ai'
 
 interface DisplayMessage {
@@ -7,12 +8,13 @@ interface DisplayMessage {
   content: string
   created_recipe_id?: string | null
   updated_recipe_id?: string | null
+  grocery_updated?: boolean
 }
 
 const SUGGESTIONS = [
+  'Pick 2 easy recipes from my Staple Dinners cookbook and add them to my grocery list',
   'Create a quick weeknight pasta recipe',
   'What can I substitute for buttermilk?',
-  'Suggest 3 recipes I can make with chicken and lemon',
   'Add a spicy version of my pasta recipe',
 ]
 
@@ -21,6 +23,7 @@ export default function AiPage() {
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const chat = useAiChat()
   const bottomRef = useRef<HTMLDivElement>(null)
+  const qc = useQueryClient()
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -38,11 +41,15 @@ export default function AiPage() {
 
     try {
       const result = await chat.mutateAsync({ message: text.trim(), history })
+      if (result.grocery_updated) {
+        qc.invalidateQueries({ queryKey: ['grocery'] })
+      }
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: result.reply,
         created_recipe_id: result.created_recipe_id,
         updated_recipe_id: result.updated_recipe_id,
+        grocery_updated: result.grocery_updated,
       }])
     } catch {
       setMessages(prev => [...prev, {
@@ -61,7 +68,7 @@ export default function AiPage() {
     <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px' }}>AI Chef</h1>
       <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
-        Ask cooking questions, get recipe ideas, or say "create a recipe for X" to add it directly to your collection.
+        Ask cooking questions, create recipes, pick meals from your cookbooks, or say "add these to my grocery list."
       </p>
 
       {/* Messages */}
@@ -133,6 +140,21 @@ export default function AiPage() {
                     }}
                   >
                     View updated recipe →
+                  </Link>
+                </div>
+              )}
+
+              {/* Link to grocery list when it was modified */}
+              {msg.grocery_updated && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--color-border)' }}>
+                  <Link
+                    to="/grocery"
+                    style={{
+                      fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)',
+                      textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    }}
+                  >
+                    View grocery list →
                   </Link>
                 </div>
               )}

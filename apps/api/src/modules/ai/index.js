@@ -6,6 +6,7 @@ import { requireAuth } from '../../middleware/auth.js'
 import { asyncHandler } from '../../middleware/errorHandler.js'
 import { normalizeIngredient } from '../../services/ingredientNormalizer.js'
 import { enqueueNutrition } from '../../workers/nutritionWorker.js'
+import { getOrCreateList, rebuildGroceryItems } from '../../services/groceryService.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -89,6 +90,36 @@ const TOOLS = [
         tags: { type: 'array', items: { type: 'string' } },
       },
       required: ['recipe_id'],
+    },
+  },
+  {
+    name: 'add_to_grocery_list',
+    description: "Add one or more recipes to the user's grocery list. Ingredient quantities are automatically merged and scaled across all recipes on the list. Use this when the user asks to add recipes to their grocery list or shopping list.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        recipe_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'UUIDs of the recipes to add to the grocery list',
+        },
+      },
+      required: ['recipe_ids'],
+    },
+  },
+  {
+    name: 'remove_from_grocery_list',
+    description: "Remove one or more recipes from the user's grocery list.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        recipe_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'UUIDs of the recipes to remove from the grocery list',
+        },
+      },
+      required: ['recipe_ids'],
     },
   },
 ]
@@ -238,6 +269,143 @@ async function executeEditRecipe(input, userId) {
   }
 }
 
+async function executeAddToGroceryList(input, userId) {
+  const { recipe_ids } = input
+  const listId = await getOrCreateList(userId)
+  const added = []
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    for (const recipeId of recipe_ids) {
+      // Verify this recipe belongs to the user
+      const { rows: [recipe] } = await client.query(
+        `SELECT id, base_servings FROM recipes WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`,
+        [recipeId, userId]
+      )
+      if (!recipe) continue // skip unknown/unauthorized ids
+
+      await client.query(
+        `INSERT INTO grocery_list_recipes (grocery_list_id, recipe_id, servings)
+         VALUES ($1,$2,$3)
+         ON CONFLICT (grocery_list_id, recipe_id) DO UPDATE SET servings = EXCLUDED.servings`,
+        [listId, recipeId, recipe.base_servings]
+      )
+      added.push(recipeId)
+    }
+
+    if (added.length > 0) await rebuildGroceryItems(listId, client)
+    await client.query('COMMIT')
+    return { success: true, added_count: added.length, grocery_list_id: listId }
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+async function executeRemoveFromGroceryList(input, userId) {
+  const { recipe_ids } = input
+  const listId = await getOrCreateList(userId)
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    for (const recipeId of recipe_ids) {
+      await client.query(
+        `DELETE FROM grocery_list_recipes WHERE grocery_list_id = $1 AND recipe_id = $2`,
+        [listId, recipeId]
+      )
+    }
+    await rebuildGroceryItems(listId, client)
+    await client.query('COMMIT')
+    return { success: true, removed_count: recipe_ids.length }
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Build rich context for the system prompt
+// ---------------------------------------------------------------------------
+
+async function buildUserContext(userId) {
+  // Recipes (lightweight — for reference in tool calls)
+  const { rows: userRecipes } = await pool.query(
+    `SELECT id, title, cuisine, difficulty FROM recipes
+     WHERE owner_id = $1 AND deleted_at IS NULL
+     ORDER BY updated_at DESC LIMIT 50`,
+    [userId]
+  )
+
+  // Cookbooks with their recipes
+  const { rows: cookbooks } = await pool.query(
+    `SELECT c.id, c.title,
+            json_agg(
+              json_build_object(
+                'id',         r.id,
+                'title',      r.title,
+                'cuisine',    r.cuisine,
+                'difficulty', r.difficulty,
+                'prep_time_mins', r.prep_time_mins,
+                'cook_time_mins', r.cook_time_mins
+              ) ORDER BY cr.display_order, cr.added_at
+            ) FILTER (WHERE r.id IS NOT NULL) AS recipes
+     FROM cookbooks c
+     LEFT JOIN cookbook_recipes cr ON cr.cookbook_id = c.id
+     LEFT JOIN recipes r ON r.id = cr.recipe_id AND r.deleted_at IS NULL
+     WHERE c.owner_id = $1 AND c.deleted_at IS NULL
+     GROUP BY c.id
+     ORDER BY c.display_order, c.created_at`,
+    [userId]
+  )
+
+  // Current grocery list recipes
+  const { rows: groceryRecipes } = await pool.query(
+    `SELECT r.id, r.title
+     FROM grocery_list_recipes glr
+     JOIN grocery_lists gl ON gl.id = glr.grocery_list_id
+     JOIN recipes r ON r.id = glr.recipe_id AND r.deleted_at IS NULL
+     WHERE gl.user_id = $1
+     ORDER BY glr.added_at`,
+    [userId]
+  )
+
+  // Format recipe list
+  const recipeListText = userRecipes.length
+    ? userRecipes.map(r =>
+        `- ${r.title} (id: ${r.id})${r.cuisine ? `, ${r.cuisine}` : ''}${r.difficulty ? `, ${r.difficulty}` : ''}`
+      ).join('\n')
+    : 'No recipes yet.'
+
+  // Format cookbooks
+  const cookbookText = cookbooks.length
+    ? cookbooks.map(cb => {
+        const recipes = (cb.recipes ?? [])
+        const recipeLines = recipes.length
+          ? recipes.map(r => {
+              const meta = [r.cuisine, r.difficulty, r.cook_time_mins ? `${r.cook_time_mins} min` : null]
+                .filter(Boolean).join(', ')
+              return `    • ${r.title} (id: ${r.id}${meta ? ', ' + meta : ''})`
+            }).join('\n')
+          : '    (empty)'
+        return `- "${cb.title}" (id: ${cb.id}):\n${recipeLines}`
+      }).join('\n')
+    : 'No cookbooks yet.'
+
+  // Format grocery list
+  const groceryText = groceryRecipes.length
+    ? groceryRecipes.map(r => `- ${r.title} (id: ${r.id})`).join('\n')
+    : 'No recipes on the grocery list yet.'
+
+  return { recipeListText, cookbookText, groceryText }
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/ai/chat
 // ---------------------------------------------------------------------------
@@ -256,46 +424,48 @@ router.post(
         reply: "AI features require a real Anthropic API key. Set ANTHROPIC_API_KEY in your Railway API service variables.",
         created_recipe_id: null,
         updated_recipe_id: null,
+        grocery_updated: false,
       })
     }
 
     const { message, history = [] } = req.body
     const userId = req.user.sub
 
-    // Fetch user's recipes to give Claude context
-    const { rows: userRecipes } = await pool.query(
-      `SELECT id, title, cuisine, difficulty FROM recipes
-       WHERE owner_id = $1 AND deleted_at IS NULL
-       ORDER BY updated_at DESC LIMIT 30`,
-      [userId]
-    )
-
-    const recipeList = userRecipes.length
-      ? userRecipes.map(r =>
-          `- ${r.title} (id: ${r.id})${r.cuisine ? `, ${r.cuisine}` : ''}${r.difficulty ? `, ${r.difficulty}` : ''}`
-        ).join('\n')
-      : 'No recipes yet.'
+    const { recipeListText, cookbookText, groceryText } = await buildUserContext(userId)
 
     const systemPrompt = `You are an AI cooking assistant built into Feast, a personal recipe organizer. You help users with:
 - Answering cooking questions and giving culinary advice
 - Suggesting recipes and creative variations
-- Recommending ingredient substitutions when someone is missing something
+- Recommending ingredient substitutions
 - Creating new recipes and saving them to their account (use the create_recipe tool)
 - Editing existing recipes (use the edit_recipe tool)
+- Adding or removing recipes from their grocery list (use add_to_grocery_list / remove_from_grocery_list)
+- Picking recipes from a specific cookbook and adding them to the grocery list
 
-The user's current recipes:
-${recipeList}
+The user's recipes:
+${recipeListText}
 
-When the user asks you to create a recipe, ALWAYS use the create_recipe tool to save it — do not just describe it in text. Be thorough: include all ingredients with quantities and clear step-by-step instructions. When editing, look up the recipe id from the list above and use the edit_recipe tool.`
+The user's cookbooks (use these when they mention a cookbook by name):
+${cookbookText}
+
+Recipes currently on the grocery list:
+${groceryText}
+
+Rules:
+- When asked to create a recipe, ALWAYS use the create_recipe tool — never just describe it in text.
+- When asked to add recipes to the grocery list, use their exact recipe ids from the context above.
+- When asked to pick recipes from a cookbook, find the cookbook by name in the list above, choose recipes from it, then call add_to_grocery_list with those recipe ids.
+- After adding to the grocery list, tell the user which recipes were added.
+- You can call multiple tools in sequence within one response (e.g. pick recipes then add them).`
 
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY })
 
     let createdRecipeId = null
     let updatedRecipeId = null
+    let groceryUpdated = false
     let finalReply = ''
 
-    // Build initial messages, filtering history to only user/assistant roles
     let currentMessages = [
       ...history.map(m => ({ role: m.role, content: m.content })),
       { role: 'user', content: message },
@@ -337,6 +507,12 @@ When the user asks you to create a recipe, ALWAYS use the create_recipe tool to 
               updatedRecipeId = id
               enqueueNutrition(id).catch(() => {})
               result = { success: true, recipe_id: id }
+            } else if (block.name === 'add_to_grocery_list') {
+              result = await executeAddToGroceryList(block.input, userId)
+              if (result.added_count > 0) groceryUpdated = true
+            } else if (block.name === 'remove_from_grocery_list') {
+              result = await executeRemoveFromGroceryList(block.input, userId)
+              groceryUpdated = true
             } else {
               result = { error: 'Unknown tool' }
             }
@@ -353,7 +529,7 @@ When the user asks you to create a recipe, ALWAYS use the create_recipe tool to 
       }
     }
 
-    res.json({ reply: finalReply, created_recipe_id: createdRecipeId, updated_recipe_id: updatedRecipeId })
+    res.json({ reply: finalReply, created_recipe_id: createdRecipeId, updated_recipe_id: updatedRecipeId, grocery_updated: groceryUpdated })
   })
 )
 

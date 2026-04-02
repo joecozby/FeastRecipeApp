@@ -10,6 +10,7 @@ export interface ChatResponse {
   reply: string
   created_recipe_id: string | null
   updated_recipe_id: string | null
+  grocery_updated: boolean
 }
 
 export function useAiChat() {
