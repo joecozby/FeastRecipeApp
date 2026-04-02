@@ -230,7 +230,7 @@ function MergedItemRow({
         color: entry.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
         textDecoration: entry.is_checked ? 'line-through' : 'none',
       }}>
-        {qtyLabel && <span style={{ fontWeight: 600, marginRight: '6px' }}>{qtyLabel}</span>}
+        {qtyLabel && <><span style={{ fontWeight: 600 }}>{qtyLabel}</span>{' '}</>}
         {entry.display_name}
       </span>
       {entry.in_spice_cabinet && (
