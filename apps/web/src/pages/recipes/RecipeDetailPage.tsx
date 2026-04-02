@@ -280,12 +280,12 @@ export default function RecipeDetailPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               onClick={() => setServings(Math.max(1, Math.round(currentServings) - 1))}
-              style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)' }}
+              style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)' }}
             >−</button>
             <span style={{ fontSize: '16px', fontWeight: 600, minWidth: '24px', textAlign: 'center' }}>{currentServings}</span>
             <button
               onClick={() => setServings(Math.round(currentServings) + 1)}
-              style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)' }}
+              style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)' }}
             >+</button>
           </div>
           {currentServings !== base && (
