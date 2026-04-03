@@ -23,6 +23,7 @@ export interface GroceryRecipe {
   title: string
   servings: number | null
   base_servings: number | null
+  cover_image_url: string | null
 }
 
 export interface GroceryList {

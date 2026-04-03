@@ -462,42 +462,63 @@ export default function GroceryPage() {
         {subtitles[viewMode]}
       </p>
 
-      {/* View mode toggle */}
-      {!isEmpty && <ViewToggle value={viewMode} onChange={setViewMode} />}
-
-      {/* Recipes in list */}
+      {/* Recipes in list — horizontal scrollable photo cards */}
       {recipes.length > 0 && (
-        <div style={{ marginBottom: '28px' }}>
+        <div style={{ marginBottom: '24px' }}>
           <p style={{
             fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
             letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '10px',
           }}>
             Recipes in list
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{
+            display: 'flex', gap: '10px', overflowX: 'auto',
+            paddingBottom: '4px',
+            scrollbarWidth: 'none',
+          }}>
             {recipes.map((r: GroceryRecipe) => (
               <div key={r.recipe_id} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 14px', background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+                flexShrink: 0, width: '120px', position: 'relative',
+                border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
+                overflow: 'hidden', background: 'var(--color-surface)',
               }}>
-                <button
+                {/* Cover photo */}
+                <div
                   onClick={() => navigate(`/recipes/${r.recipe_id}`)}
                   style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: '14px', fontWeight: 500, color: 'var(--color-text)',
-                    padding: 0, fontFamily: 'var(--font-sans)', textAlign: 'left',
+                    width: '100%', height: '80px', cursor: 'pointer',
+                    background: r.cover_image_url
+                      ? `url(${r.cover_image_url}) center/cover no-repeat`
+                      : 'var(--color-border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
-                  {r.title}
-                  {r.servings && r.base_servings && r.servings !== r.base_servings && (
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginLeft: '6px' }}>
-                      ({r.servings} servings)
-                    </span>
+                  {!r.cover_image_url && (
+                    <span style={{ fontSize: '28px' }}>🍽️</span>
                   )}
-                </button>
+                </div>
+                {/* Text */}
+                <div
+                  onClick={() => navigate(`/recipes/${r.recipe_id}`)}
+                  style={{ padding: '8px 8px 6px', cursor: 'pointer' }}
+                >
+                  <p style={{
+                    fontSize: '12px', fontWeight: 600, lineHeight: 1.3,
+                    color: 'var(--color-text)',
+                    display: '-webkit-box', WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    marginBottom: '4px',
+                  }}>
+                    {r.title}
+                  </p>
+                  <p style={{ fontSize: '11px', color: 'var(--color-primary)', fontWeight: 500 }}>
+                    View recipe &rsaquo;
+                  </p>
+                </div>
+                {/* Remove X */}
                 <button
-                  onClick={async () => {
+                  onClick={async (e) => {
+                    e.stopPropagation()
                     const ok = await confirm({
                       title: 'Remove from Grocery List',
                       message: `Remove "${r.title}" from your grocery list?`,
@@ -508,17 +529,24 @@ export default function GroceryPage() {
                     await removeRecipe.mutateAsync(r.recipe_id)
                   }}
                   style={{
-                    background: 'none', border: 'none', color: 'var(--color-text-muted)',
-                    cursor: 'pointer', fontSize: '13px', padding: '2px 6px',
+                    position: 'absolute', top: '5px', right: '5px',
+                    width: '20px', height: '20px', borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.55)', border: 'none',
+                    color: '#fff', fontSize: '12px', fontWeight: 700,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    lineHeight: 1, padding: 0,
                   }}
                 >
-                  Remove
+                  ×
                 </button>
               </div>
             ))}
           </div>
         </div>
       )}
+
+      {/* View mode toggle */}
+      {!isEmpty && <ViewToggle value={viewMode} onChange={setViewMode} />}
 
       {/* Empty state */}
       {isEmpty ? (
