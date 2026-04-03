@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/Input'
 
 export default function RegisterPage() {
   const [displayName, setDisplayName] = useState('')
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -24,6 +25,7 @@ export default function RegisterPage() {
         email,
         password,
         display_name: displayName,
+        username,
       })
       setAuth(data.token, data.user)
       navigate('/recipes')
@@ -68,6 +70,20 @@ export default function RegisterPage() {
             required
             autoFocus
           />
+          <div>
+            <Input
+              label="Username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              placeholder="juliachild"
+              required
+              autoComplete="username"
+            />
+            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+              3–20 characters · letters, numbers, underscores only
+            </p>
+          </div>
           <Input
             label="Email"
             type="email"

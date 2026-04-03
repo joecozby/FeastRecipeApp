@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,7 +20,7 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const { data } = await client.post('/auth/login', { email, password })
+      const { data } = await client.post('/auth/login', { login, password })
       queryClient.clear()
       setAuth(data.token, data.user)
       navigate('/recipes')
@@ -57,13 +57,14 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            label="Email or username"
+            type="text"
+            value={login}
+            onChange={(e) => setLogin(e.target.value)}
+            placeholder="you@example.com or @username"
             required
             autoFocus
+            autoComplete="username"
           />
           <Input
             label="Password"

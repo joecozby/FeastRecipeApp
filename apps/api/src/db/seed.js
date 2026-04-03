@@ -12,6 +12,7 @@ const DEMO_USER = {
   email: 'demo@feast.app',
   password: 'password123',
   display_name: 'Feast Demo',
+  username: 'demo',
 }
 
 const SYSTEM_TAGS = [
@@ -230,11 +231,11 @@ async function seed() {
     const passwordHash = await bcrypt.hash(DEMO_USER.password, 12)
 
     const { rows: [user] } = await pool.query(
-      `INSERT INTO users (email, password_hash, role)
-       VALUES ($1, $2, 'user')
-       ON CONFLICT (email) DO UPDATE SET updated_at = now()
+      `INSERT INTO users (email, password_hash, username, role)
+       VALUES ($1, $2, $3, 'user')
+       ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username, updated_at = now()
        RETURNING id`,
-      [DEMO_USER.email, passwordHash]
+      [DEMO_USER.email, passwordHash, DEMO_USER.username]
     )
     const userId = user.id
 
