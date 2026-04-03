@@ -1,4 +1,5 @@
 import { useState, useRef, useLayoutEffect } from 'react'
+import { useMobile } from '../../hooks/useMobile'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useRecipe, usePublishRecipe, useDeleteRecipe, useRecipeNutrition, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
 import { useCookbooks, useAddRecipeToCookbook } from '../../api/cookbooks'
@@ -143,6 +144,7 @@ function InstructionStep({ step }: { step: Instruction }) {
 }
 
 export default function RecipeDetailPage() {
+  const isMobile = useMobile()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: recipe, isLoading } = useRecipe(id!)
@@ -327,8 +329,13 @@ export default function RecipeDetailPage() {
         </div>
       ) : null}
 
-      {/* Ingredients + Instructions grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '40px', alignItems: 'start' }}>
+      {/* Ingredients + Instructions — side by side on desktop, stacked on mobile */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '240px 1fr',
+        gap: isMobile ? '32px' : '40px',
+        alignItems: 'start',
+      }}>
         <div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700 }}>Ingredients</h2>
