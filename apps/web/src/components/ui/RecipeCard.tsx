@@ -81,6 +81,9 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
             lineHeight: 1.3,
             color: 'var(--color-text)',
             marginBottom: '9px',
+            // Fixed height for exactly 2 lines (16px × 1.3 × 2 = 41.6px → 42px)
+            // ensures all cards are the same height regardless of title length.
+            height: '42px',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
