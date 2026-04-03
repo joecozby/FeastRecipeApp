@@ -1,6 +1,20 @@
 import pool from '../config/db.js'
 
 // ---------------------------------------------------------------------------
+// Strip preparation text that may have leaked into a canonical name.
+// e.g. "bell peppers into strips" → "bell peppers"
+//      "onion thinly sliced"      → "onion"
+// This is a safety net for ingredients imported before PREP_TERMS was complete.
+// ---------------------------------------------------------------------------
+const PREP_LEAK_RE = /\s*,?\s*(?:cut\s+into\b|into\s+(?:strips?|pieces?|cubes?|chunks?|rings?|wedges?|florets?|matchsticks?)\b|cut\s+up\b|cut\s+in\s+half\b|thinly\b|finely\b|roughly\b|coarsely\b|freshly\b|lightly\b|peeled\b|sliced\b|chopped\b|diced\b|minced\b|grated\b|shredded\b|crushed\b|halved\b|quartered\b|cubed\b|trimmed\b|torn\b|blanched\b|roasted\b|toasted\b|softened\b|melted\b|drained\b|rinsed\b|deveined\b).*/i
+
+function cleanDisplayName(name) {
+  if (!name) return name
+  const cleaned = name.replace(PREP_LEAK_RE, '').replace(/,\s*$/, '').trim()
+  return cleaned || name
+}
+
+// ---------------------------------------------------------------------------
 // Build a stable ingredient_key for grouping across recipes
 // ---------------------------------------------------------------------------
 
@@ -83,7 +97,7 @@ export async function rebuildGroceryItems(groceryListId, client) {
       const scaledQty = ing.quantity != null
         ? Math.round(parseFloat(ing.quantity) * scale * 10000) / 10000
         : null
-      const displayName = ing.canonical_name || ing.raw_text
+      const displayName = cleanDisplayName(ing.canonical_name || ing.raw_text)
       const ingredientKey = makeIngredientKey(ing.ingredient_id, ing.unit, ing.raw_text)
       const isChecked = checkedByKey.get(ingredientKey) ?? false
 

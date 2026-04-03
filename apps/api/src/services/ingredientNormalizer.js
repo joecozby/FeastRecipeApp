@@ -35,13 +35,29 @@ const UNIT_MAP = {
 
 // Preparation terms to extract from ingredient name
 const PREP_TERMS = [
-  'chopped', 'finely chopped', 'roughly chopped', 'coarsely chopped',
-  'minced', 'diced', 'sliced', 'thinly sliced', 'thickly sliced',
-  'grated', 'finely grated', 'shredded',
-  'crushed', 'peeled', 'julienned', 'halved', 'quartered',
-  'cubed', 'trimmed', 'cleaned', 'rinsed', 'drained',
+  // Cutting — specific "cut into X" forms first (longest match wins after sort)
+  'cut into thin strips', 'cut into thick strips', 'cut into strips',
+  'cut into small pieces', 'cut into large pieces', 'cut into pieces',
+  'cut into small cubes', 'cut into large cubes', 'cut into cubes',
+  'cut into chunks', 'cut into florets', 'cut into rings', 'cut into wedges',
+  'cut into matchsticks', 'cut into bite-sized pieces', 'cut in half',
+  'cut up', 'cut',
+  'into thin strips', 'into thick strips', 'into strips',
+  'into small pieces', 'into large pieces', 'into pieces',
+  'into cubes', 'into chunks', 'into florets', 'into rings', 'into wedges',
+  'into matchsticks',
+  // Standard prep verbs
+  'finely chopped', 'roughly chopped', 'coarsely chopped', 'chopped',
+  'thinly sliced', 'thickly sliced', 'sliced',
+  'finely grated', 'coarsely grated', 'grated',
+  'finely minced', 'minced',
+  'diced', 'shredded', 'julienned',
+  'crushed', 'peeled', 'halved', 'quartered', 'cubed', 'torn',
+  'trimmed', 'cleaned', 'rinsed', 'drained', 'patted dry',
   'softened', 'melted', 'room temperature',
-  'toasted', 'roasted',
+  'toasted', 'roasted', 'blanched', 'parboiled',
+  'deveined', 'butterflied', 'scored', 'pounded',
+  'separated', 'divided', 'sifted',
 ]
 // Sort longest first so "finely chopped" matches before "chopped"
 PREP_TERMS.sort((a, b) => b.length - a.length)

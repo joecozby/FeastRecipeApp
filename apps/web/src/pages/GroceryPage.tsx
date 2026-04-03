@@ -119,25 +119,48 @@ function buildByRecipe(
     .map(([rid, items]) => ({ recipe: recipeMap.get(rid)!, items }))
 }
 
-// Derive a grocery-aisle category from an ingredient name
+// Derive a grocery-aisle category from an ingredient name.
+// Rules:
+//  - Trailing \b is intentionally omitted so plurals match (tomatoes, eggs, peppers…)
+//  - Fresh produce items that also appear as dried spices (garlic, onion, ginger)
+//    are sent to Produce unless the name signals a processed form.
 function categorize(name: string): string {
   const n = name.toLowerCase()
-  if (/\b(milk|cream|butter|cheese|egg|yogurt|sour cream|half.and.half|whipping|mozzarella|cheddar|parmesan|ricotta|brie|feta)\b/.test(n))
+
+  // Dairy & Eggs — check eggs? to match "egg" and "eggs"
+  if (/\b(milk|cream|butter|cheese|eggs?|yogurt|sour cream|half.and.half|whipping|mozzarella|cheddar|parmesan|ricotta|brie|feta)/.test(n))
     return 'Dairy & Eggs'
-  if (/\b(chicken|beef|pork|lamb|turkey|veal|duck|bacon|sausage|ham|shrimp|salmon|tuna|cod|tilapia|crab|lobster|scallop|anchovy|prosciutto|pancetta|ground meat|steak|fillet|tenderloin)\b/.test(n))
+
+  // Meat & Seafood
+  if (/\b(chicken|beef|pork|lamb|turkey|veal|duck|bacon|sausage|ham|shrimp|salmon|tuna|cod|tilapia|crab|lobster|scallop|anchov|prosciutto|pancetta|steak|fillet|tenderloin)/.test(n))
     return 'Meat & Seafood'
-  if (/\b(apple|banana|berry|strawberr|blueberr|raspberr|lemon|lime|orange|grape|mango|peach|pear|plum|cherry|pineapple|watermelon|melon|avocado|tomato|lettuce|spinach|kale|arugula|carrot|celery|cucumber|bell pepper|zucchini|squash|potato|sweet potato|broccoli|cauliflower|asparagus|corn|pea|green bean|snap pea|eggplant|artichoke|beet|radish|leek|shallot|scallion|green onion|cabbage|brussels sprout|bok choy|chard|collard|endive|fennel|turnip|parsnip|rutabaga|jicama|yam|taro|plantain|fruit|vegetable|produce|fresh herb|cilantro|parsley|basil|mint|dill|chive|sage|rosemary|thyme|oregano|tarragon|bay leaf)\b/.test(n))
+
+  // Produce — skip if the name signals a dried / processed form so that
+  // "garlic powder" or "dried basil" doesn't land here.
+  const isProcessed = /\b(powder|dried|ground|flakes?|extract|paste|sauce|oil|syrup|pickled|canned|frozen)/.test(n)
+  if (!isProcessed && /\b(apple|banana|berr|strawberr|blueberr|raspberr|lemon|lime|orange|grape|mango|peach|pear|plum|cherr|pineapple|watermelon|melon|avocado|tomato|lettuce|spinach|kale|arugula|carrot|celery|cucumber|bell pepper|jalape|poblano|anaheim|zucchini|squash|potato|broccoli|cauliflower|asparagus|corn|peas?|green bean|snap pea|eggplant|artichoke|beet|radish|leek|shallot|scallion|green onion|onion|garlic|ginger|cabbage|brussels sprout|bok choy|chard|collard|endive|fennel|turnip|parsnip|rutabaga|jicama|yam|taro|plantain|mushroom|cilantro|parsley|basil|mint|dill|chive|sage|rosemary|thyme|oregano|tarragon|bay leaf|fruit|vegetable|produce|fresh)/.test(n))
     return 'Produce'
-  if (/\b(bread|tortilla|pasta|rice|noodle|spaghetti|fettuccine|penne|linguine|ramen|udon|soba|couscous|quinoa|farro|barley|oat|cereal|cracker|chip|pita|roll|bun|baguette|sourdough|bagel|croissant|flour|corn meal|polenta)\b/.test(n))
+
+  // Grains & Bread
+  if (/\b(bread|tortilla|pasta|rice|noodle|spaghetti|fettuccine|penne|linguine|ramen|udon|soba|couscous|quinoa|farro|barley|oat|cereal|cracker|chip|pita|roll|bun|baguette|sourdough|bagel|croissant|flour|cornmeal|polenta)/.test(n))
     return 'Grains & Bread'
-  if (/\b(garlic|onion|ginger|cumin|paprika|turmeric|cinnamon|cayenne|chili|pepper|salt|coriander|cardamom|clove|nutmeg|allspice|star anise|fennel seed|mustard seed|caraway|saffron|sumac|za.atar|herbes de provence|italian seasoning|old bay|cajun|curry|garam masala|five spice|seasoning|spice|herb)\b/.test(n))
+
+  // Herbs & Spices (also catches dried forms of produce herbs/veg)
+  if (/\b(garlic|onion|ginger|cumin|paprika|turmeric|cinnamon|cayenne|chili|pepper|salt|coriander|cardamom|clove|nutmeg|allspice|star anise|fennel seed|mustard seed|caraway|saffron|sumac|za.atar|herbes de provence|italian seasoning|old bay|cajun|curry|garam masala|five spice|seasoning|spice|herb|basil|oregano|thyme|rosemary|sage|dill|tarragon|parsley|cilantro|mint|chive|bay leaf|vanilla)/.test(n))
     return 'Herbs & Spices'
-  if (/\b(oil|olive oil|vegetable oil|canola|coconut oil|sesame oil|vinegar|balsamic|soy sauce|fish sauce|oyster sauce|hoisin|worcestershire|hot sauce|sriracha|ketchup|mustard|mayo|mayonnaise|ranch|tahini|miso|tomato paste|tomato sauce|canned|beans|lentil|chickpea|black bean|kidney bean|pinto|lentil|flour|sugar|brown sugar|honey|maple syrup|molasses|jam|peanut butter|almond butter|cocoa|chocolate|vanilla|baking powder|baking soda|yeast|cornstarch|broth|stock|bouillon|cream of tartar|breadcrumb|panko)\b/.test(n))
+
+  // Pantry
+  if (/\b(oil|vinegar|balsamic|soy sauce|fish sauce|oyster sauce|hoisin|worcestershire|hot sauce|sriracha|ketchup|mustard|mayo|mayonnaise|ranch|tahini|miso|tomato paste|tomato sauce|canned|beans?|lentil|chickpea|black bean|kidney bean|pinto|flour|sugar|brown sugar|honey|maple syrup|molasses|jam|peanut butter|almond butter|cocoa|chocolate|baking powder|baking soda|yeast|cornstarch|broth|stock|bouillon|cream of tartar|breadcrumb|panko)/.test(n))
     return 'Pantry'
-  if (/\b(frozen|ice cream|gelato|sorbet)\b/.test(n))
+
+  // Frozen
+  if (/\b(frozen|ice cream|gelato|sorbet)/.test(n))
     return 'Frozen'
-  if (/\b(water|juice|wine|beer|spirits|vodka|rum|whiskey|gin|tequila|coffee|tea|soda|sparkling|almond milk|oat milk|soy milk|beverage|drink|broth|stock)\b/.test(n))
+
+  // Beverages
+  if (/\b(water|juice|wine|beer|spirits|vodka|rum|whiskey|gin|tequila|coffee|tea|soda|sparkling|almond milk|oat milk|soy milk|beverage|drink)/.test(n))
     return 'Beverages'
+
   return 'Other'
 }
 
