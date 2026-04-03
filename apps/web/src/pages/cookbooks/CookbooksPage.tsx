@@ -51,6 +51,13 @@ function CookbookCollage({ photos, height = 140 }: { photos: string[]; height?: 
     gridTemplateRows: n <= 2 ? '1fr' : '1fr 1fr',
   }
 
+  // Explicit grid placement for 3-photo layout to avoid auto-placement ambiguity
+  const placement3: CSSProperties[] = [
+    { gridColumn: 1, gridRow: '1 / 3' }, // left, full height
+    { gridColumn: 2, gridRow: 1 },        // right top
+    { gridColumn: 2, gridRow: 2 },        // right bottom
+  ]
+
   return (
     <div style={gridStyle}>
       {photos.slice(0, n).map((url, i) => (
@@ -64,8 +71,7 @@ function CookbookCollage({ photos, height = 140 }: { photos: string[]; height?: 
             height: '100%',
             objectFit: 'cover',
             display: 'block',
-            // For 3-photo layout the first image spans both rows on the left
-            gridRow: n === 3 && i === 0 ? '1 / 3' : undefined,
+            ...(n === 3 ? placement3[i] : {}),
           }}
         />
       ))}
