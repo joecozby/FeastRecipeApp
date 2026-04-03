@@ -6,11 +6,11 @@ import { Button } from '../components/ui/Button'
 import { Input, Textarea } from '../components/ui/Input'
 
 type TabId = 'url' | 'instagram' | 'text' | 'photo'
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: 'url',       label: 'Web URL',    icon: '🔗' },
-  { id: 'instagram', label: 'Instagram',  icon: '📸' },
-  { id: 'text',      label: 'Paste Text', icon: '📋' },
-  { id: 'photo',     label: 'Photo',      icon: '📷' },
+const TABS: { id: TabId; label: string; shortLabel: string; icon: string }[] = [
+  { id: 'url',       label: 'Web URL',    shortLabel: 'URL',       icon: '🔗' },
+  { id: 'instagram', label: 'Instagram',  shortLabel: 'Instagram', icon: '📸' },
+  { id: 'text',      label: 'Paste Text', shortLabel: 'Text',      icon: '📋' },
+  { id: 'photo',     label: 'Photo',      shortLabel: 'Photo',     icon: '📷' },
 ]
 
 function StatusCard({ icon, title, description, color, action }: {
@@ -287,17 +287,20 @@ export default function ImportPage() {
         {TABS.map((t) => (
           <button key={t.id} onClick={() => switchTab(t.id)} style={{
             flex: 1, minWidth: 0,
-            padding: '7px 4px', borderRadius: 'var(--radius-sm)', border: 'none',
-            fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+            padding: isMobile ? '6px 2px' : '7px 4px',
+            borderRadius: 'var(--radius-sm)', border: 'none',
+            fontSize: isMobile ? '11px' : '13px', fontWeight: 500, cursor: 'pointer',
             background: tab === t.id ? 'var(--color-surface)' : 'transparent',
             color: tab === t.id ? 'var(--color-text)' : 'var(--color-text-muted)',
             boxShadow: tab === t.id ? 'var(--shadow-sm)' : 'none',
-            transition: 'all 0.15s', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', gap: '5px',
-            fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap', overflow: 'hidden',
+            transition: 'all 0.15s',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? '2px' : '5px',
+            fontFamily: 'var(--font-sans)',
           }}>
-            <span style={{ flexShrink: 0 }}>{t.icon}</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.label}</span>
+            <span style={{ fontSize: isMobile ? '16px' : 'inherit', lineHeight: 1 }}>{t.icon}</span>
+            <span>{isMobile ? t.shortLabel : t.label}</span>
           </button>
         ))}
       </div>
