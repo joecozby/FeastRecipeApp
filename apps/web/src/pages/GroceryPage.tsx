@@ -478,7 +478,7 @@ export default function GroceryPage() {
           }}>
             {recipes.map((r: GroceryRecipe) => (
               <div key={r.recipe_id} style={{
-                flexShrink: 0, width: '120px', position: 'relative',
+                flexShrink: 0, width: '150px', position: 'relative',
                 border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
                 overflow: 'hidden', background: 'var(--color-surface)',
               }}>
@@ -486,7 +486,7 @@ export default function GroceryPage() {
                 <div
                   onClick={() => navigate(`/recipes/${r.recipe_id}`)}
                   style={{
-                    width: '100%', height: '80px', cursor: 'pointer',
+                    width: '100%', height: '100px', cursor: 'pointer',
                     background: r.cover_image_url
                       ? `url(${r.cover_image_url}) center/cover no-repeat`
                       : 'var(--color-border)',
