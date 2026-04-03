@@ -208,6 +208,7 @@ JWT_SECRET          (48-byte hex string)
 NODE_ENV            production
 ALLOWED_ORIGINS     https://your-web-url.up.railway.app
 ANTHROPIC_API_KEY   sk-ant-... (or sk-ant-stub to use stub parser)
+UNSPLASH_ACCESS_KEY (optional) free key from unsplash.com/developers — enables AI Chef cover photos
 PORT                (injected by Railway automatically)
 ```
 

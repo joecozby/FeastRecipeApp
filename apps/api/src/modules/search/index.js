@@ -8,22 +8,19 @@ import { asyncHandler } from '../../middleware/errorHandler.js'
 const router = Router()
 router.use(requireAuth)
 
-// GET /api/search?q=&cuisine=&tags=&difficulty=&cookbook=&limit=&cursor=
+// GET /api/search?q=&cookbook=&limit=&cursor=
+// q matches title, description, ingredients, cuisine, difficulty, and tags in one pass
 router.get(
   '/',
   [
     query('q').optional().isString().trim(),
-    query('cuisine').optional().isString(),
-    query('difficulty').optional().isIn(['easy', 'medium', 'hard']),
-    query('tags').optional().isString(),       // comma-separated tag names
     query('cookbook').optional().isUUID(),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
     query('cursor').optional().isFloat().toFloat(),
     validate,
   ],
   asyncHandler(async (req, res) => {
-    const { q, cuisine, difficulty, cookbook } = req.query
-    const tags = req.query.tags ? req.query.tags.split(',').map((t) => t.trim().toLowerCase()) : []
+    const { q, cookbook } = req.query
     const limit = req.query.limit ?? 24
     const cursor = req.query.cursor ?? null
 
@@ -47,38 +44,34 @@ router.get(
       if (prefixQuery) {
         params.push(prefixQuery)
         const pqi = params.length
-        // Score: prefix FTS rank + word_similarity (handles partial substring matches)
+        // Score: prefix FTS rank + word_similarity on title (handles partial substring matches)
         scoreExpr = `(ts_rank(r.fts_vector, to_tsquery('english', $${pqi})) * 2 + word_similarity($${qi}, r.title))`
         conditions.push(
           `(r.fts_vector @@ to_tsquery('english', $${pqi})
             OR word_similarity($${qi}, r.title) > 0.1
-            OR r.title ILIKE '%' || $${qi} || '%')`
+            OR r.title ILIKE '%' || $${qi} || '%'
+            OR r.cuisine ILIKE '%' || $${qi} || '%'
+            OR r.difficulty ILIKE '%' || $${qi} || '%'
+            OR EXISTS (
+              SELECT 1 FROM recipe_tags rt
+              JOIN tags t ON t.id = rt.tag_id
+              WHERE rt.recipe_id = r.id AND t.name ILIKE '%' || $${qi} || '%'
+            ))`
         )
       } else {
         scoreExpr = `word_similarity($${qi}, r.title)`
-        conditions.push(`(word_similarity($${qi}, r.title) > 0.1 OR r.title ILIKE '%' || $${qi} || '%')`)
+        conditions.push(
+          `(word_similarity($${qi}, r.title) > 0.1
+            OR r.title ILIKE '%' || $${qi} || '%'
+            OR r.cuisine ILIKE '%' || $${qi} || '%'
+            OR r.difficulty ILIKE '%' || $${qi} || '%'
+            OR EXISTS (
+              SELECT 1 FROM recipe_tags rt
+              JOIN tags t ON t.id = rt.tag_id
+              WHERE rt.recipe_id = r.id AND t.name ILIKE '%' || $${qi} || '%'
+            ))`
+        )
       }
-    }
-
-    if (cuisine) {
-      params.push(cuisine)
-      conditions.push(`lower(r.cuisine) = lower($${params.length})`)
-    }
-
-    if (difficulty) {
-      params.push(difficulty)
-      conditions.push(`r.difficulty = $${params.length}`)
-    }
-
-    if (tags.length > 0) {
-      params.push(tags)
-      conditions.push(
-        `EXISTS (
-          SELECT 1 FROM recipe_tags rt
-          JOIN tags t ON t.id = rt.tag_id
-          WHERE rt.recipe_id = r.id AND lower(t.name) = ANY($${params.length})
-        )`
-      )
     }
 
     if (cookbook) {

@@ -439,7 +439,7 @@ export default function RecipeDetailPage() {
               </span>
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: '10px' }}>
             {([
               { label: 'Calories', value: nutrition.per_serving.calories, unit: 'kcal' },
               { label: 'Protein',  value: nutrition.per_serving.protein,  unit: 'g' },

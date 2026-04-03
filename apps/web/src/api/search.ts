@@ -3,9 +3,6 @@ import client from './client'
 
 export interface SearchParams {
   q?: string
-  cuisine?: string
-  difficulty?: string
-  tags?: string
   cookbook?: string
 }
 

@@ -7,6 +7,7 @@ import { asyncHandler } from '../../middleware/errorHandler.js'
 import { normalizeIngredient } from '../../services/ingredientNormalizer.js'
 import { enqueueNutrition } from '../../workers/nutritionWorker.js'
 import { getOrCreateList, rebuildGroceryItems } from '../../services/groceryService.js'
+import { findAndAttachCoverImage } from '../../services/coverImageService.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -501,6 +502,9 @@ Rules:
               const id = await executeCreateRecipe(block.input, userId)
               createdRecipeId = id
               enqueueNutrition(id).catch(() => {})
+              // Fire-and-forget: search Unsplash for a cover photo matching the
+              // recipe title and attach it.  Never blocks or fails the response.
+              findAndAttachCoverImage(id, userId, block.input.title).catch(() => {})
               result = { success: true, recipe_id: id }
             } else if (block.name === 'edit_recipe') {
               const id = await executeEditRecipe(block.input, userId)
