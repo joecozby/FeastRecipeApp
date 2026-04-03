@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, FormEvent, ReactNode, DragEvent, ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useImportRecipe, useImportJobStatus, ImportResult } from '../api/recipes'
+import { useMobile } from '../hooks/useMobile'
 import { Button } from '../components/ui/Button'
 import { Input, Textarea } from '../components/ui/Input'
 
@@ -178,6 +179,7 @@ function PhotoDropZone({ dataUrl, onFile, onClear, disabled }: {
 // ---------------------------------------------------------------------------
 export default function ImportPage() {
   const navigate = useNavigate()
+  const isMobile = useMobile()
   const [tab, setTab]             = useState<TabId>('url')
   const [input, setInput]         = useState('')
   const [photoData, setPhotoData] = useState('')   // compressed base64 data URL
@@ -332,13 +334,13 @@ export default function ImportPage() {
           {tab === 'url' && (
             <Input label="Recipe URL" type="url" value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="https://www.example.com/recipes/pasta" autoFocus />
+              placeholder="https://www.example.com/recipes/pasta" autoFocus={!isMobile} />
           )}
           {tab === 'instagram' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <Input label="Instagram post URL" type="url" value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="https://www.instagram.com/p/..." autoFocus />
+                placeholder="https://www.instagram.com/p/..." autoFocus={!isMobile} />
               <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                 Only public posts are supported. If Instagram blocks the import, you will be prompted to paste the caption instead.
               </p>
@@ -368,7 +370,7 @@ export default function ImportPage() {
               <Textarea label="Recipe text" value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Paste the full recipe here — title, ingredients, and steps."
-                style={{ minHeight: '240px' }} autoFocus />
+                style={{ minHeight: '240px' }} autoFocus={!isMobile} />
             </>
           )}
           {tab === 'photo' && (
