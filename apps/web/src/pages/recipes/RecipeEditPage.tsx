@@ -51,6 +51,15 @@ export default function RecipeEditPage() {
   const [tags, setTags] = useState<string[]>([])
 
   const [error, setError] = useState('')
+  const ingredientsContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!ingredientsContainerRef.current) return
+    ingredientsContainerRef.current.querySelectorAll<HTMLTextAreaElement>('textarea[data-ing]').forEach((ta) => {
+      ta.style.height = 'auto'
+      ta.style.height = ta.scrollHeight + 'px'
+    })
+  }, [ingredients])
 
   useEffect(() => {
     if (!recipe) return
@@ -263,20 +272,17 @@ export default function RecipeEditPage() {
         {/* Ingredients */}
         <section>
           <h2 style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '16px' }}>Ingredients</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div ref={ingredientsContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {ingredients.map((ing, i) => (
               // Single row: [ingredient textarea flex-1] [group] [Optional checkbox] [×]
               // Textarea auto-grows to wrap long ingredient text; controls top-align.
               <div key={i} style={{ display: 'flex', gap: isMobile ? '5px' : '8px', alignItems: 'flex-start' }}>
                 <textarea
+                  data-ing
                   value={ing.raw_text}
                   rows={1}
                   onChange={(e) => {
                     updateIngredient(i, 'raw_text', e.target.value)
-                    e.target.style.height = 'auto'
-                    e.target.style.height = e.target.scrollHeight + 'px'
-                  }}
-                  onFocus={(e) => {
                     e.target.style.height = 'auto'
                     e.target.style.height = e.target.scrollHeight + 'px'
                   }}
@@ -287,7 +293,7 @@ export default function RecipeEditPage() {
                   value={ing.group_label}
                   onChange={(e) => updateIngredient(i, 'group_label', e.target.value)}
                   placeholder="Group"
-                  style={{ ...inputStyle, width: isMobile ? '66px' : '120px', flexShrink: 0 }}
+                  style={{ ...inputStyle, width: isMobile ? '78px' : '120px', flexShrink: 0 }}
                 />
                 <label style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px', color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: '9px' }}>
                   <input
