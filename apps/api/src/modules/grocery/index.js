@@ -23,9 +23,10 @@ router.get('/', asyncHandler(async (req, res) => {
       [listId]
     ),
     pool.query(
-      `SELECT glr.recipe_id, glr.servings, r.title, r.base_servings, r.cover_image_url
+      `SELECT glr.recipe_id, glr.servings, r.title, r.base_servings, m.url AS cover_image_url
        FROM grocery_list_recipes glr
        JOIN recipes r ON r.id = glr.recipe_id
+       LEFT JOIN media_assets m ON m.id = r.cover_media_id
        WHERE glr.grocery_list_id = $1 AND r.deleted_at IS NULL
        ORDER BY glr.added_at`,
       [listId]
