@@ -52,6 +52,7 @@ export default function RecipeEditPage() {
 
   const [error, setError] = useState('')
   const ingredientsContainerRef = useRef<HTMLDivElement>(null)
+  const instructionsContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!ingredientsContainerRef.current) return
@@ -60,6 +61,14 @@ export default function RecipeEditPage() {
       ta.style.height = ta.scrollHeight + 'px'
     })
   }, [ingredients])
+
+  useEffect(() => {
+    if (!instructionsContainerRef.current) return
+    instructionsContainerRef.current.querySelectorAll<HTMLTextAreaElement>('textarea[data-inst]').forEach((ta) => {
+      ta.style.height = 'auto'
+      ta.style.height = ta.scrollHeight + 'px'
+    })
+  }, [instructions])
 
   useEffect(() => {
     if (!recipe) return
@@ -319,7 +328,7 @@ export default function RecipeEditPage() {
         {/* Instructions */}
         <section>
           <h2 style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '16px' }}>Instructions</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div ref={instructionsContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {instructions.map((step, i) => (
               <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                 <span style={{
@@ -330,10 +339,16 @@ export default function RecipeEditPage() {
                 }}>{i + 1}</span>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <textarea
+                    data-inst
                     value={step.body}
-                    onChange={(e) => updateInstruction(i, 'body', e.target.value)}
+                    rows={1}
+                    onChange={(e) => {
+                      updateInstruction(i, 'body', e.target.value)
+                      e.target.style.height = 'auto'
+                      e.target.style.height = e.target.scrollHeight + 'px'
+                    }}
                     placeholder="Describe this step..."
-                    style={{ ...inputStyle, resize: 'vertical', minHeight: '72px', width: '100%' }}
+                    style={{ ...inputStyle, resize: 'none', overflow: 'hidden', lineHeight: '1.5', width: '100%' }}
                   />
                   <input
                     value={step.group_label}
