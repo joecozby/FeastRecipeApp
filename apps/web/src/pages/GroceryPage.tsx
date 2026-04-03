@@ -10,10 +10,184 @@ import {
   GroceryRecipe,
 } from '../api/grocery'
 import { useMySpiceCabinet, useAddToSpiceCabinet } from '../api/spiceCabinet'
+import { useInstacartShoppingLink, flattenForInstacart } from '../api/instacart'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { useConfirm } from '../components/ui/ConfirmModal'
+
+// ---------------------------------------------------------------------------
+// Instacart carrot logo SVG (brand colors: #FF7009 orange, #0AAD0A green)
+// Replace with official asset from Instacart_logos.zip before go-live.
+// ---------------------------------------------------------------------------
+function InstacartCarrot({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      {/* Carrot body */}
+      <path d="M16 7 C16 7 22 14 22 20 C22 24.4 19.3 27 16 27 C12.7 27 10 24.4 10 20 C10 14 16 7 16 7Z" fill="#FF7009"/>
+      {/* Left leaf */}
+      <path d="M16 7 C16 7 12 4 8 6 C10 8 13 8 16 7Z" fill="#0AAD0A"/>
+      {/* Right leaf */}
+      <path d="M16 7 C16 7 20 4 24 6 C22 8 19 8 16 7Z" fill="#0AAD0A"/>
+      {/* Center leaf */}
+      <path d="M16 7 C16 7 16 2 16 2 C16 2 14 4 16 7Z" fill="#0AAD0A"/>
+    </svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Instacart-branded "Shop on Instacart" button
+// Spec: dark kale #003D29 bg, cashew #FAF1E5 text, 46px tall, pill shape
+// ---------------------------------------------------------------------------
+function InstacartButton({ onClick, loading }: { onClick: () => void; loading?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        gap: '10px',
+        height: '46px',
+        paddingLeft: '18px', paddingRight: '18px',
+        borderRadius: '999px',
+        background: loading ? '#5a8a78' : '#003D29',
+        color: '#FAF1E5',
+        border: 'none',
+        cursor: loading ? 'default' : 'pointer',
+        fontSize: '15px',
+        fontWeight: 600,
+        fontFamily: 'var(--font-sans)',
+        whiteSpace: 'nowrap',
+        transition: 'background 0.15s',
+        width: '100%',
+      }}
+      onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#005238' }}
+      onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#003D29' }}
+    >
+      <InstacartCarrot size={22} />
+      {loading ? 'Building your cart…' : 'Shop on Instacart'}
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Instacart checkout modal
+// ---------------------------------------------------------------------------
+function InstacartModal({
+  items,
+  onClose,
+}: {
+  items: GroceryItem[]
+  onClose: () => void
+}) {
+  const [extraText, setExtraText] = useState('')
+  const [error, setError] = useState('')
+  const shoppingLink = useInstacartShoppingLink()
+  const addManual = useAddManualGroceryItems()
+
+  const uncheckedItems = items.filter((i) => !i.is_checked)
+  const itemCount = flattenForInstacart(uncheckedItems).length
+
+  async function handleShop() {
+    setError('')
+    // Parse any extra items the user typed
+    let allItems = [...uncheckedItems]
+    if (extraText.trim()) {
+      const lines = extraText.split('\n').map((l) => l.trim()).filter(Boolean)
+      // Add them to the grocery list so they persist, then include in Instacart call
+      try {
+        await addManual.mutateAsync(lines)
+      } catch { /* non-fatal — still attempt Instacart */ }
+      // Also include them inline as parsed items for the Instacart call
+      const extraItems = lines.map((l) => ({
+        id: '', recipe_id: null, ingredient_id: null,
+        ingredient_key: `manual:${l}`, display_name: l,
+        quantity: null, unit: null, is_checked: false, is_manual: true,
+        notes: null, display_order: 999, spice_cabinet_master_id: null, in_spice_cabinet: false,
+      } as GroceryItem))
+      allItems = [...allItems, ...extraItems]
+    }
+
+    const flatItems = flattenForInstacart(allItems)
+    const result = await shoppingLink.mutateAsync({ items: flatItems, title: 'My Grocery List — Feast' })
+
+    if (result.stub || !result.url) {
+      setError('Instacart integration coming soon — your list has been saved!')
+      return
+    }
+    window.open(result.url, '_blank', 'noopener,noreferrer')
+    onClose()
+  }
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.45)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      }}
+    >
+      <div style={{
+        width: '100%', maxWidth: '480px',
+        background: 'var(--color-bg)',
+        borderRadius: '20px 20px 0 0',
+        padding: '28px 24px 36px',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+      }}>
+        {/* Handle */}
+        <div style={{
+          width: '40px', height: '4px', borderRadius: '2px',
+          background: 'var(--color-border)', margin: '0 auto 24px',
+        }} />
+
+        {/* Header */}
+        <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>
+          Ready to shop?
+        </h2>
+        <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>
+          {itemCount} item{itemCount !== 1 ? 's' : ''} will be sent to Instacart.
+          Checked-off items are excluded.
+        </p>
+
+        {/* Extra items textarea */}
+        <label style={{ display: 'block', marginBottom: '16px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Anything else to add?
+          </p>
+          <textarea
+            value={extraText}
+            onChange={(e) => setExtraText(e.target.value)}
+            placeholder={'e.g. paper towels\ndish soap\nsparkling water'}
+            rows={3}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '10px 12px', borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+              fontSize: '14px', color: 'var(--color-text)', fontFamily: 'var(--font-sans)',
+              resize: 'none', lineHeight: 1.5,
+            }}
+          />
+        </label>
+
+        {error && (
+          <p style={{ fontSize: '13px', marginBottom: '12px', color: error.includes('soon') ? 'var(--color-text-muted)' : '#dc2626' }}>
+            {error}
+          </p>
+        )}
+
+        {/* Instacart button */}
+        <InstacartButton onClick={handleShop} loading={shoppingLink.isPending || addManual.isPending} />
+
+        {/* Trademark attribution — required by Instacart guidelines */}
+        <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '12px', lineHeight: 1.4 }}>
+          Instacart® is a registered trademark of Maplebear Inc. d/b/a Instacart.
+          Service fees apply.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -447,6 +621,7 @@ export default function GroceryPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('combined')
   const [addText, setAddText] = useState('')
   const [addError, setAddError] = useState('')
+  const [showInstacart, setShowInstacart] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { confirm, modal: confirmModal } = useConfirm()
   const { data: myCabinet } = useMySpiceCabinet()
@@ -625,6 +800,29 @@ export default function GroceryPage() {
         </div>
       </div>
 
+      {/* Order Online button */}
+      {!isEmpty && (
+        <button
+          onClick={() => setShowInstacart(true)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            width: '100%', padding: '14px',
+            marginBottom: '24px',
+            borderRadius: 'var(--radius-lg)',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            cursor: 'pointer', fontFamily: 'var(--font-sans)',
+            fontSize: '15px', fontWeight: 600, color: 'var(--color-text)',
+            transition: 'border-color 0.15s, background 0.15s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#003D29'; e.currentTarget.style.background = '#f5fbf8' }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.background = 'var(--color-surface)' }}
+        >
+          <InstacartCarrot size={20} />
+          Order online
+        </button>
+      )}
+
       {/* View mode toggle */}
       {!isEmpty && <ViewToggle value={viewMode} onChange={setViewMode} />}
 
@@ -666,6 +864,9 @@ export default function GroceryPage() {
         </>
       )}
       {confirmModal}
+      {showInstacart && (
+        <InstacartModal items={items} onClose={() => setShowInstacart(false)} />
+      )}
     </div>
   )
 }
