@@ -265,33 +265,42 @@ export default function RecipeEditPage() {
           <h2 style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '16px' }}>Ingredients</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {ingredients.map((ing, i) => (
-              // Single row: [ingredient flex-1] [group ~90px] [Opt checkbox] [× delete]
-              // Group shrinks on mobile; "Optional" becomes "Opt" to save space.
-              <div key={i} style={{ display: 'flex', gap: isMobile ? '5px' : '8px', alignItems: 'center' }}>
-                <input
+              // Single row: [ingredient textarea flex-1] [group] [Optional checkbox] [×]
+              // Textarea auto-grows to wrap long ingredient text; controls top-align.
+              <div key={i} style={{ display: 'flex', gap: isMobile ? '5px' : '8px', alignItems: 'flex-start' }}>
+                <textarea
                   value={ing.raw_text}
-                  onChange={(e) => updateIngredient(i, 'raw_text', e.target.value)}
+                  rows={1}
+                  onChange={(e) => {
+                    updateIngredient(i, 'raw_text', e.target.value)
+                    e.target.style.height = 'auto'
+                    e.target.style.height = e.target.scrollHeight + 'px'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.height = 'auto'
+                    e.target.style.height = e.target.scrollHeight + 'px'
+                  }}
                   placeholder="e.g. 2 cups flour"
-                  style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                  style={{ ...inputStyle, flex: 1, minWidth: 0, resize: 'none', overflow: 'hidden', lineHeight: '1.4' }}
                 />
                 <input
                   value={ing.group_label}
                   onChange={(e) => updateIngredient(i, 'group_label', e.target.value)}
                   placeholder="Group"
-                  style={{ ...inputStyle, width: isMobile ? '72px' : '130px', flexShrink: 0 }}
+                  style={{ ...inputStyle, width: isMobile ? '66px' : '120px', flexShrink: 0 }}
                 />
-                <label style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px', color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: '9px' }}>
                   <input
                     type="checkbox"
                     checked={ing.is_optional}
                     onChange={(e) => updateIngredient(i, 'is_optional', e.target.checked)}
                   />
-                  {isMobile ? 'Opt' : 'Optional'}
+                  Optional
                 </label>
                 <button
                   type="button"
                   onClick={() => removeIngredient(i)}
-                  style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '2px', flexShrink: 0 }}
+                  style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '2px', flexShrink: 0, paddingTop: '7px' }}
                 >×</button>
               </div>
             ))}
