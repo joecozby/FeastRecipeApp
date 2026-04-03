@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useRecipe, useUpdateRecipe, useSaveRecipeContent, useUploadCoverImage, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea } from '../../components/ui/Input'
+import { useMobile } from '../../hooks/useMobile'
 
 interface IngredientRow {
   raw_text: string
@@ -26,6 +27,7 @@ const inputStyle = {
 }
 
 export default function RecipeEditPage() {
+  const isMobile = useMobile()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: recipe, isLoading } = useRecipe(id!)
@@ -263,32 +265,38 @@ export default function RecipeEditPage() {
           <h2 style={{ fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '16px' }}>Ingredients</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {ingredients.map((ing, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 150px auto auto', gap: '8px', alignItems: 'center' }}>
-                <input
-                  value={ing.raw_text}
-                  onChange={(e) => updateIngredient(i, 'raw_text', e.target.value)}
-                  placeholder="e.g. 2 cups flour"
-                  style={inputStyle}
-                />
-                <input
-                  value={ing.group_label}
-                  onChange={(e) => updateIngredient(i, 'group_label', e.target.value)}
-                  placeholder="Group (optional)"
-                  style={inputStyle}
-                />
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {/* Row 1: ingredient text + delete */}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <input
-                    type="checkbox"
-                    checked={ing.is_optional}
-                    onChange={(e) => updateIngredient(i, 'is_optional', e.target.checked)}
+                    value={ing.raw_text}
+                    onChange={(e) => updateIngredient(i, 'raw_text', e.target.value)}
+                    placeholder="e.g. 2 cups flour"
+                    style={{ ...inputStyle, flex: 1, minWidth: 0 }}
                   />
-                  Optional
-                </label>
-                <button
-                  type="button"
-                  onClick={() => removeIngredient(i)}
-                  style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '4px' }}
-                >×</button>
+                  <button
+                    type="button"
+                    onClick={() => removeIngredient(i)}
+                    style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '4px', flexShrink: 0 }}
+                  >×</button>
+                </div>
+                {/* Row 2: group label + optional checkbox */}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingRight: isMobile ? '30px' : '0' }}>
+                  <input
+                    value={ing.group_label}
+                    onChange={(e) => updateIngredient(i, 'group_label', e.target.value)}
+                    placeholder="Group (optional)"
+                    style={{ ...inputStyle, flex: 1, minWidth: 0, fontSize: '12px' }}
+                  />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={ing.is_optional}
+                      onChange={(e) => updateIngredient(i, 'is_optional', e.target.checked)}
+                    />
+                    Optional
+                  </label>
+                </div>
               </div>
             ))}
             <Button type="button" variant="ghost" onClick={addIngredient} style={{ alignSelf: 'flex-start' }}>
