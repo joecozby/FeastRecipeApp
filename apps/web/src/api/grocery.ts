@@ -12,6 +12,7 @@ export interface GroceryItem {
   quantity: number | null
   unit: string | null
   is_checked: boolean
+  is_manual: boolean
   notes: string | null
   display_order: number
   spice_cabinet_master_id: number | null
@@ -81,6 +82,23 @@ export function useToggleGroceryItem() {
       if (ctx?.prev) qc.setQueryData(['grocery'], ctx.prev)
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['grocery'] }),
+  })
+}
+
+export function useAddManualGroceryItems() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (lines: string[]) =>
+      client.post('/grocery-lists/items/manual', { lines }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['grocery'] }),
+  })
+}
+
+export function useRemoveManualGroceryItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => client.delete(`/grocery-lists/items/manual/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['grocery'] }),
   })
 }
 

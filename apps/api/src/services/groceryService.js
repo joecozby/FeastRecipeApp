@@ -70,9 +70,9 @@ export async function rebuildGroceryItems(groceryListId, client) {
     }
   }
 
-  // 3. Delete all existing items
+  // 3. Delete only recipe-sourced items (preserve is_manual rows)
   await client.query(
-    `DELETE FROM grocery_list_items WHERE grocery_list_id = $1`,
+    `DELETE FROM grocery_list_items WHERE grocery_list_id = $1 AND is_manual = FALSE`,
     [groceryListId]
   )
 

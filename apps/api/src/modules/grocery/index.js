@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validate.js'
 import { requireAuth } from '../../middleware/auth.js'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { getOrCreateList, rebuildGroceryItems } from '../../services/groceryService.js'
+import { parseRawText, normalizeIngredient } from '../../services/ingredientNormalizer.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -191,6 +192,76 @@ router.patch(
     )
 
     res.json({ ok: true })
+  })
+)
+
+// ---------------------------------------------------------------------------
+// POST /api/grocery-lists/items/manual  — add hand-typed items
+// Accepts { lines: string[] }, parses each with the ingredient normalizer,
+// inserts with is_manual = true so they survive recipe-triggered rebuilds.
+// ---------------------------------------------------------------------------
+router.post(
+  '/items/manual',
+  [
+    body('lines').isArray({ min: 1 }).withMessage('lines must be a non-empty array'),
+    body('lines.*').isString().trim().notEmpty(),
+    validate,
+  ],
+  asyncHandler(async (req, res) => {
+    const listId = await getOrCreateList(req.user.sub)
+    const lines = req.body.lines.map((l) => l.trim()).filter(Boolean)
+
+    // Get current max display_order so manual items go to the bottom
+    const { rows: [{ max_order }] } = await pool.query(
+      `SELECT COALESCE(MAX(display_order), -1) AS max_order
+       FROM grocery_list_items WHERE grocery_list_id = $1`,
+      [listId]
+    )
+    let order = (max_order ?? -1) + 1
+
+    const inserted = []
+    for (const line of lines) {
+      const parsed = parseRawText(line)
+      // Normalize to get ingredient_id if possible (non-fatal)
+      let ingredientId = null
+      try {
+        const norm = await normalizeIngredient(line)
+        ingredientId = norm?.ingredient_id ?? null
+      } catch { /* ignore */ }
+
+      const displayName = parsed.name || line
+      const ingredientKey = `manual:${displayName.toLowerCase().replace(/\s+/g, '_')}`
+
+      const { rows: [item] } = await pool.query(
+        `INSERT INTO grocery_list_items
+           (grocery_list_id, ingredient_id, display_name, quantity, unit,
+            ingredient_key, display_order, is_manual)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+         RETURNING *`,
+        [listId, ingredientId, displayName, parsed.quantity, parsed.unit, ingredientKey, order++]
+      )
+      inserted.push(item)
+    }
+
+    res.status(201).json(inserted)
+  })
+)
+
+// ---------------------------------------------------------------------------
+// DELETE /api/grocery-lists/items/manual/:id  — remove a single manual item
+// ---------------------------------------------------------------------------
+router.delete(
+  '/items/manual/:id',
+  [param('id').isUUID(), validate],
+  asyncHandler(async (req, res) => {
+    const listId = await getOrCreateList(req.user.sub)
+    const { rowCount } = await pool.query(
+      `DELETE FROM grocery_list_items
+       WHERE id = $1 AND grocery_list_id = $2 AND is_manual = TRUE`,
+      [req.params.id, listId]
+    )
+    if (!rowCount) throw new AppError('Item not found', 404)
+    res.status(204).send()
   })
 )
 

@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   useGroceryList,
   useRemoveRecipeFromGrocery,
   useToggleGroceryItem,
   useToggleIngredientGroup,
+  useAddManualGroceryItems,
+  useRemoveManualGroceryItem,
   GroceryItem,
   GroceryRecipe,
 } from '../api/grocery'
@@ -30,6 +32,7 @@ interface MergedEntry {
   recipe_count: number  // how many recipes contribute
   in_spice_cabinet: boolean
   spice_cabinet_master_id: number | null
+  is_manual: boolean    // true when item was hand-typed (no recipe source)
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +91,7 @@ function mergeItems(items: GroceryItem[]): MergedEntry {
     recipe_count: items.length,
     in_spice_cabinet: items[0].in_spice_cabinet ?? false,
     spice_cabinet_master_id: items[0].spice_cabinet_master_id ?? null,
+    is_manual: items.every((i) => i.is_manual),
   }
 }
 
@@ -230,53 +234,69 @@ function ViewToggle({ value, onChange }: { value: ViewMode; onChange: (v: ViewMo
 function MergedItemRow({
   entry,
   onToggle,
+  onRemoveManual,
 }: {
   entry: MergedEntry
   onToggle: (key: string, val: boolean) => void
+  onRemoveManual?: (ids: string[]) => void
 }) {
   const qtyLabel = formatQty(entry.quantity, entry.unit)
   return (
-    <label style={{
-      display: 'flex', alignItems: 'center', gap: '12px',
-      padding: '11px 14px', background: 'var(--color-surface)',
-      border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
-      cursor: 'pointer', userSelect: 'none',
-    }}>
-      <input
-        type="checkbox"
-        checked={entry.is_checked}
-        onChange={(e) => onToggle(entry.ingredient_key, e.target.checked)}
-        style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)', flexShrink: 0 }}
-      />
-      <span style={{
-        flex: 1, fontSize: '14px',
-        color: entry.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
-        textDecoration: entry.is_checked ? 'line-through' : 'none',
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <label style={{
+        flex: 1, display: 'flex', alignItems: 'center', gap: '12px',
+        padding: '11px 14px', background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+        cursor: 'pointer', userSelect: 'none',
       }}>
-        {qtyLabel && <><span style={{ fontWeight: 600 }}>{qtyLabel}</span>{' '}</>}
-        {entry.display_name}
-      </span>
-      {entry.in_spice_cabinet && (
+        <input
+          type="checkbox"
+          checked={entry.is_checked}
+          onChange={(e) => onToggle(entry.ingredient_key, e.target.checked)}
+          style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)', flexShrink: 0 }}
+        />
         <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: '3px',
-          fontSize: '11px', fontWeight: 500,
-          color: 'rgba(232, 106, 51, 0.75)',
-          background: 'rgba(232, 106, 51, 0.08)',
-          border: '1px solid rgba(232, 106, 51, 0.2)',
-          borderRadius: 'var(--radius-full)',
-          padding: '2px 8px',
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
+          flex: 1, fontSize: '14px',
+          color: entry.is_checked ? 'var(--color-text-muted)' : 'var(--color-text)',
+          textDecoration: entry.is_checked ? 'line-through' : 'none',
         }}>
-          🧂 In cabinet
+          {qtyLabel && <><span style={{ fontWeight: 600 }}>{qtyLabel}</span>{' '}</>}
+          {entry.display_name}
         </span>
+        {entry.in_spice_cabinet && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '3px',
+            fontSize: '11px', fontWeight: 500,
+            color: 'rgba(232, 106, 51, 0.75)',
+            background: 'rgba(232, 106, 51, 0.08)',
+            border: '1px solid rgba(232, 106, 51, 0.2)',
+            borderRadius: 'var(--radius-full)',
+            padding: '2px 8px',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}>
+            🧂 In cabinet
+          </span>
+        )}
+        {!entry.in_spice_cabinet && entry.recipe_count > 1 && (
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+            {entry.recipe_count} recipes
+          </span>
+        )}
+      </label>
+      {entry.is_manual && onRemoveManual && (
+        <button
+          onClick={() => onRemoveManual(entry.item_ids)}
+          style={{
+            background: 'none', border: 'none', color: 'var(--color-text-muted)',
+            cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '4px', flexShrink: 0,
+          }}
+          title="Remove item"
+        >
+          ×
+        </button>
       )}
-      {!entry.in_spice_cabinet && entry.recipe_count > 1 && (
-        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-          {entry.recipe_count} recipes
-        </span>
-      )}
-    </label>
+    </div>
   )
 }
 
@@ -421,8 +441,13 @@ export default function GroceryPage() {
   const removeRecipe = useRemoveRecipeFromGrocery()
   const toggleItem = useToggleGroceryItem()
   const toggleGroup = useToggleIngredientGroup()
+  const addManualItems = useAddManualGroceryItems()
+  const removeManualItem = useRemoveManualGroceryItem()
   const navigate = useNavigate()
   const [viewMode, setViewMode] = useState<ViewMode>('combined')
+  const [addText, setAddText] = useState('')
+  const [addError, setAddError] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { confirm, modal: confirmModal } = useConfirm()
   const { data: myCabinet } = useMySpiceCabinet()
   const addToCabinet = useAddToSpiceCabinet()
@@ -437,6 +462,19 @@ export default function GroceryPage() {
 
   function handleDismissSuggestion(masterId: number) {
     setDismissedSuggestions((prev) => new Set([...prev, masterId]))
+  }
+
+  async function handleAddManual() {
+    const lines = addText.split('\n').map((l) => l.trim()).filter(Boolean)
+    if (!lines.length) return
+    setAddError('')
+    try {
+      await addManualItems.mutateAsync(lines)
+      setAddText('')
+      if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    } catch {
+      setAddError('Failed to add items. Please try again.')
+    }
   }
 
   if (isLoading) {
@@ -545,6 +583,48 @@ export default function GroceryPage() {
         </div>
       )}
 
+      {/* Add items section */}
+      <div style={{ marginBottom: '24px' }}>
+        <p style={{
+          fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
+          letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '10px',
+        }}>
+          Add Items
+        </p>
+        <textarea
+          ref={textareaRef}
+          value={addText}
+          onChange={(e) => { setAddText(e.target.value); setAddError('') }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault()
+              handleAddManual()
+            }
+          }}
+          placeholder={'Type ingredients, one per line:\n2 cups flour\n3 large eggs\n1 lb butter'}
+          rows={3}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '10px 12px', borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+            fontSize: '14px', color: 'var(--color-text)', fontFamily: 'var(--font-sans)',
+            resize: 'none', lineHeight: 1.5,
+          }}
+        />
+        {addError && (
+          <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px' }}>{addError}</p>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+          <Button
+            onClick={handleAddManual}
+            loading={addManualItems.isPending}
+            disabled={!addText.trim()}
+          >
+            Add to List
+          </Button>
+        </div>
+      </div>
+
       {/* View mode toggle */}
       {!isEmpty && <ViewToggle value={viewMode} onChange={setViewMode} />}
 
@@ -562,6 +642,7 @@ export default function GroceryPage() {
             <CombinedView
               items={items}
               onToggleGroup={(key, val) => toggleGroup.mutate({ ingredient_key: key, is_checked: val })}
+              onRemoveManual={(ids) => ids.forEach((id) => removeManualItem.mutate(id))}
             />
           )}
           {viewMode === 'by-recipe' && (
@@ -579,6 +660,7 @@ export default function GroceryPage() {
             <ByCategoryView
               items={items}
               onToggleGroup={(key, val) => toggleGroup.mutate({ ingredient_key: key, is_checked: val })}
+              onRemoveManual={(ids) => ids.forEach((id) => removeManualItem.mutate(id))}
             />
           )}
         </>
@@ -595,9 +677,11 @@ export default function GroceryPage() {
 function CombinedView({
   items,
   onToggleGroup,
+  onRemoveManual,
 }: {
   items: GroceryItem[]
   onToggleGroup: (key: string, val: boolean) => void
+  onRemoveManual: (ids: string[]) => void
 }) {
   const combined = buildCombined(items)
   const unchecked = combined.filter((e) => !e.is_checked)
@@ -610,7 +694,7 @@ function CombinedView({
           <SectionHeader label="To buy" count={unchecked.length} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {unchecked.map((entry) => (
-              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} />
+              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onRemoveManual={onRemoveManual} />
             ))}
           </div>
         </div>
@@ -620,7 +704,7 @@ function CombinedView({
           <SectionHeader label="In cart" count={checked.length} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {checked.map((entry) => (
-              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} />
+              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onRemoveManual={onRemoveManual} />
             ))}
           </div>
         </div>
@@ -711,9 +795,11 @@ function ByRecipeView({
 function ByCategoryView({
   items,
   onToggleGroup,
+  onRemoveManual,
 }: {
   items: GroceryItem[]
   onToggleGroup: (key: string, val: boolean) => void
+  onRemoveManual: (ids: string[]) => void
 }) {
   const categories = buildByCategory(items)
 
@@ -728,10 +814,10 @@ function ByCategoryView({
             <SectionHeader label={category} count={total} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {unchecked.map((entry) => (
-                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} />
+                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onRemoveManual={onRemoveManual} />
               ))}
               {checked.map((entry) => (
-                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} />
+                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onRemoveManual={onRemoveManual} />
               ))}
             </div>
           </div>
