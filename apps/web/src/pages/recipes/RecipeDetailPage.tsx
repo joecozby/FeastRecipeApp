@@ -259,31 +259,49 @@ export default function RecipeDetailPage() {
         )}
       </div>
 
-      {/* Meta */}
-      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginBottom: '16px' }}>
-        {recipe.cuisine && (
-          <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>🌍 {recipe.cuisine}</span>
+      {/* Meta — on mobile: cuisine+difficulty on row 1, times on row 2 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+        {/* Row 1: cuisine + difficulty */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {recipe.cuisine && (
+            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>🌍 {recipe.cuisine}</span>
+          )}
+          {recipe.difficulty && DIFFICULTY_STYLE[recipe.difficulty] && (
+            <span style={{
+              fontSize: '12px', fontWeight: 700,
+              color: DIFFICULTY_STYLE[recipe.difficulty].color,
+              background: DIFFICULTY_STYLE[recipe.difficulty].bg,
+              padding: '3px 10px', borderRadius: 'var(--radius-full)',
+              fontFamily: 'var(--font-sans)',
+            }}>
+              {recipe.difficulty.charAt(0).toUpperCase() + recipe.difficulty.slice(1)}
+            </span>
+          )}
+          {/* On desktop keep times in the same row */}
+          {!isMobile && recipe.prep_time_mins ? (
+            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>⏱ Prep {formatTime(recipe.prep_time_mins)}</span>
+          ) : null}
+          {!isMobile && recipe.cook_time_mins ? (
+            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>🔥 Cook {formatTime(recipe.cook_time_mins)}</span>
+          ) : null}
+          {!isMobile && totalMins > 0 && recipe.prep_time_mins && recipe.cook_time_mins ? (
+            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Total {formatTime(totalMins)}</span>
+          ) : null}
+        </div>
+        {/* Row 2 (mobile only): times */}
+        {isMobile && (recipe.prep_time_mins || recipe.cook_time_mins) && (
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {recipe.prep_time_mins ? (
+              <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>⏱ Prep {formatTime(recipe.prep_time_mins)}</span>
+            ) : null}
+            {recipe.cook_time_mins ? (
+              <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>🔥 Cook {formatTime(recipe.cook_time_mins)}</span>
+            ) : null}
+            {totalMins > 0 && recipe.prep_time_mins && recipe.cook_time_mins ? (
+              <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Total {formatTime(totalMins)}</span>
+            ) : null}
+          </div>
         )}
-        {recipe.difficulty && DIFFICULTY_STYLE[recipe.difficulty] && (
-          <span style={{
-            fontSize: '12px', fontWeight: 700,
-            color: DIFFICULTY_STYLE[recipe.difficulty].color,
-            background: DIFFICULTY_STYLE[recipe.difficulty].bg,
-            padding: '3px 10px', borderRadius: 'var(--radius-full)',
-            fontFamily: 'var(--font-sans)',
-          }}>
-            {recipe.difficulty.charAt(0).toUpperCase() + recipe.difficulty.slice(1)}
-          </span>
-        )}
-        {recipe.prep_time_mins ? (
-          <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>⏱ Prep {formatTime(recipe.prep_time_mins)}</span>
-        ) : null}
-        {recipe.cook_time_mins ? (
-          <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>🔥 Cook {formatTime(recipe.cook_time_mins)}</span>
-        ) : null}
-        {totalMins > 0 && recipe.prep_time_mins && recipe.cook_time_mins ? (
-          <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Total {formatTime(totalMins)}</span>
-        ) : null}
       </div>
 
       {/* Tags */}
