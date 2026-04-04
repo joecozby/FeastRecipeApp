@@ -127,11 +127,23 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
     scraped = await scrapeUrl(sourceInput)
     sourceUrl = sourceInput
 
-    // If scraper extracted full ingredients + instructions, skip AI
-    if (scraped.ingredients.length > 0 && scraped.instructions.length > 0) {
+    // If scraper extracted full ingredients + instructions, skip AI —
+    // unless instructions look like a single concatenated blob (needs AI to split into steps)
+    const instructionsAreSplit = scraped.instructions.length > 1 ||
+      (scraped.instructions.length === 1 &&
+        !/(\d+\.\s|\bStep\s+\d+\b)/i.test(scraped.instructions[0]?.body ?? ''))
+
+    if (scraped.ingredients.length > 0 && scraped.instructions.length > 0 && instructionsAreSplit) {
       logger.info('Import: JSON-LD extraction successful, skipping AI parse', { jobId })
       const recipeId = await saveRecipe(userId, scraped, sourceUrl, scraped)
       return { recipeId, coverImageUrl: scraped.cover_image_url || null, ogImage: scraped.og_image || null }
+    }
+
+    if (scraped.ingredients.length > 0 && scraped.instructions.length > 0 && !instructionsAreSplit) {
+      logger.info('Import: instructions appear to be a single blob — routing through AI to split', { jobId })
+      // Provide scraped ingredients but let AI split the instructions from the raw page text
+      textToParse = scraped.raw_page_text
+        || [scraped.title, scraped.description].filter(Boolean).join('\n\n')
     }
 
     // Fall through to AI parse — use full page text if available, otherwise title+description
@@ -168,6 +180,10 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
     if (!parsed.servings && scraped.servings) parsed.servings = scraped.servings
     if (!parsed.prep_time_mins && scraped.prep_time_mins) parsed.prep_time_mins = scraped.prep_time_mins
     if (!parsed.cook_time_mins && scraped.cook_time_mins) parsed.cook_time_mins = scraped.cook_time_mins
+    // If AI returned no ingredients but scraper had them, prefer scraped (more reliable)
+    if ((!parsed.ingredients || parsed.ingredients.length === 0) && scraped.ingredients.length > 0) {
+      parsed.ingredients = scraped.ingredients
+    }
   }
 
   // Step 3 — Save
