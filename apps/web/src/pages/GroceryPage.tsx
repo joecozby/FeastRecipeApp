@@ -93,7 +93,7 @@ function InstacartModal({
     // Parse any extra items the user typed
     let allItems = [...uncheckedItems]
     if (extraText.trim()) {
-      const lines = extraText.split('\n').map((l) => l.trim()).filter(Boolean)
+      const lines = extraText.split(/[\n,]+/).map((l) => l.trim()).filter(Boolean)
       // Add them to the grocery list so they persist, then include in Instacart call
       try {
         await addManual.mutateAsync(lines)
@@ -640,7 +640,7 @@ export default function GroceryPage() {
   }
 
   async function handleAddManual() {
-    const lines = addText.split('\n').map((l) => l.trim()).filter(Boolean)
+    const lines = addText.split(/[\n,]+/).map((l) => l.trim()).filter(Boolean)
     if (!lines.length) return
     setAddError('')
     try {
@@ -776,8 +776,8 @@ export default function GroceryPage() {
               handleAddManual()
             }
           }}
-          placeholder={'Type ingredients, one per line:\n2 cups flour\n3 large eggs\n1 lb butter'}
-          rows={3}
+          placeholder={'e.g. 2 cups flour, 3 large eggs, 1 lb butter'}
+          rows={2}
           style={{
             width: '100%', boxSizing: 'border-box',
             padding: '10px 12px', borderRadius: 'var(--radius-md)',
