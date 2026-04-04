@@ -37,11 +37,28 @@ function CookbookCollage({ photos, height = 140 }: { photos: string[]; height?: 
     )
   }
 
-  // Grid layout per photo count:
-  //   1 → full bleed
-  //   2 → two columns side by side
-  //   3 → large left + two stacked right
-  //   4 → 2 × 2
+  const imgStyle: CSSProperties = { width: '100%', height: '100%', objectFit: 'cover', display: 'block' }
+
+  // 3-photo: flexbox row — large left (50%) + right column of two stacked (50%)
+  if (n === 3) {
+    return (
+      <div style={{ height, display: 'flex', gap: '2px', overflow: 'hidden' }}>
+        <div style={{ flex: '0 0 50%', height: '100%' }}>
+          <img src={photos[0]} alt="" draggable={false} style={{ ...imgStyle }} />
+        </div>
+        <div style={{ flex: '0 0 calc(50% - 2px)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <img src={photos[1]} alt="" draggable={false} style={{ ...imgStyle }} />
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <img src={photos[2]} alt="" draggable={false} style={{ ...imgStyle }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 1, 2, or 4 photos — grid
   const gridStyle: CSSProperties = {
     height,
     display: 'grid',
@@ -51,13 +68,6 @@ function CookbookCollage({ photos, height = 140 }: { photos: string[]; height?: 
     gridTemplateRows: n <= 2 ? '1fr' : '1fr 1fr',
   }
 
-  // Explicit grid placement for 3-photo layout to avoid auto-placement ambiguity
-  const placement3: CSSProperties[] = [
-    { gridColumn: 1, gridRow: '1 / 3' }, // left, full height
-    { gridColumn: 2, gridRow: 1 },        // right top
-    { gridColumn: 2, gridRow: 2 },        // right bottom
-  ]
-
   return (
     <div style={gridStyle}>
       {photos.slice(0, n).map((url, i) => (
@@ -66,13 +76,7 @@ function CookbookCollage({ photos, height = 140 }: { photos: string[]; height?: 
           src={url}
           alt=""
           draggable={false}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            display: 'block',
-            ...(n === 3 ? placement3[i] : {}),
-          }}
+          style={imgStyle}
         />
       ))}
     </div>
