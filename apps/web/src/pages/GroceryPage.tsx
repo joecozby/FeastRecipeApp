@@ -762,12 +762,21 @@ export default function GroceryPage() {
 
       {/* Add items section */}
       <div style={{ marginBottom: '24px' }}>
-        <p style={{
-          fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
-          letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '10px',
-        }}>
-          Add Items
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <p style={{
+            fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
+            letterSpacing: '0.06em', color: 'var(--color-text-muted)', margin: 0,
+          }}>
+            Add Items
+          </p>
+          <Button
+            onClick={handleAddManual}
+            loading={addManualItems.isPending}
+            disabled={!addText.trim()}
+          >
+            Add to List
+          </Button>
+        </div>
         <textarea
           ref={textareaRef}
           value={addText}
@@ -791,15 +800,6 @@ export default function GroceryPage() {
         {addError && (
           <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px' }}>{addError}</p>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-          <Button
-            onClick={handleAddManual}
-            loading={addManualItems.isPending}
-            disabled={!addText.trim()}
-          >
-            Add to List
-          </Button>
-        </div>
       </div>
 
       {/* Order Online button */}
