@@ -125,21 +125,18 @@ function InstacartModal({
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '24px',
       }}
     >
       <div style={{
         width: '100%', maxWidth: '480px',
         background: 'var(--color-bg)',
-        borderRadius: '20px 20px 0 0',
-        padding: '28px 24px 36px',
-        boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+        borderRadius: 'var(--radius-xl)',
+        padding: '28px 24px 32px',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.2)',
       }}>
-        {/* Handle */}
-        <div style={{
-          width: '40px', height: '4px', borderRadius: '2px',
-          background: 'var(--color-border)', margin: '0 auto 24px',
-        }} />
+
 
         {/* Header */}
         <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>
