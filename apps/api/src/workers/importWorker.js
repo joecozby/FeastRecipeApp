@@ -141,9 +141,11 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
 
     if (scraped.ingredients.length > 0 && scraped.instructions.length > 0 && !instructionsAreSplit) {
       logger.info('Import: instructions appear to be a single blob — routing through AI to split', { jobId })
-      // Provide scraped ingredients but let AI split the instructions from the raw page text
-      textToParse = scraped.raw_page_text
-        || [scraped.title, scraped.description].filter(Boolean).join('\n\n')
+      // Build a focused prompt: give AI the blob directly so it splits it into numbered steps.
+      // Include the scraped ingredients so AI has the full picture.
+      const blobText = scraped.instructions.map((s) => s.body).join('\n')
+      const ingredientList = scraped.ingredients.map((i) => i.raw_text).join('\n')
+      textToParse = `Title: ${scraped.title || ''}\n\nIngredients:\n${ingredientList}\n\nInstructions:\n${blobText}`
     }
 
     // Fall through to AI parse — use full page text if available, otherwise title+description

@@ -242,6 +242,9 @@ export async function scrapeUrl(url) {
     // as a fallback so the worker can try it if the primary URL is blocked.
     if (!result.cover_image_url) result.cover_image_url = ogImage
     result.og_image = ogImage
+    // Always extract raw page text so the AI parser can use it as a fallback
+    // (e.g. when JSON-LD instructions are a single concatenated blob)
+    result.raw_page_text = extractPageText($)
     return result
   }
 
