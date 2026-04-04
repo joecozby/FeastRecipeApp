@@ -458,11 +458,16 @@ function MergedItemRow({
       {entry.is_manual && onRemoveManual && (
         <button
           onClick={() => onRemoveManual(entry.item_ids)}
-          style={{
-            background: 'none', border: 'none', color: 'var(--color-text-muted)',
-            cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '4px', flexShrink: 0,
-          }}
           title="Remove item"
+          style={{
+            background: 'none', border: 'none',
+            color: '#dc2626', cursor: 'pointer',
+            fontSize: '20px', lineHeight: 1,
+            padding: '6px 8px', flexShrink: 0,
+            opacity: 0.75,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.75' }}
         >
           ×
         </button>
