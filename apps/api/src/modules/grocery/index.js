@@ -35,7 +35,7 @@ router.get('/', asyncHandler(async (req, res) => {
     pool.query(
       `SELECT gli.id, gli.recipe_id, gli.ingredient_id, gli.display_name,
               gli.quantity::float AS quantity, gli.unit, gli.is_checked,
-              gli.notes, gli.ingredient_key, gli.display_order,
+              gli.is_manual, gli.notes, gli.ingredient_key, gli.display_order,
               scm.id AS spice_cabinet_master_id,
               (usc.master_id IS NOT NULL) AS in_spice_cabinet
        FROM grocery_list_items gli
