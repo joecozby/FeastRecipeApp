@@ -11,12 +11,14 @@ import {
   FlameKindling,
   X,
   ArrowLeft,
+  Share2,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMobile } from '../../hooks/useMobile'
 import { useCookbooks, type CookbookSummary } from '../../api/cookbooks'
 import { useSearch } from '../../api/search'
 import type { RecipeSummary } from '../../api/recipes'
+import { ShareModal } from '../ui/ShareModal'
 
 const NAV_ITEMS = [
   { to: '/recipes',       label: 'Recipes',       Icon: UtensilsCrossed },
@@ -328,10 +330,11 @@ function AppShell() {
   const { user } = useAuthStore()
   const isMobile = useMobile()
   const [searchOpen, setSearchOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
-  // Close search overlay whenever we leave mobile (e.g. resize to desktop)
+  // Close overlays whenever we leave mobile (e.g. resize to desktop)
   useEffect(() => {
-    if (!isMobile) setSearchOpen(false)
+    if (!isMobile) { setSearchOpen(false); setShareOpen(false) }
   }, [isMobile])
 
   return (
@@ -390,6 +393,34 @@ function AppShell() {
                 {label}
               </NavLink>
             ))}
+          </div>
+
+          {/* Share button */}
+          <div style={{ padding: '0 8px 4px' }}>
+            <button
+              onClick={() => setShareOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                width: '100%', padding: '9px 12px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: '14px', fontWeight: 400,
+                color: 'var(--color-text-muted)',
+                fontFamily: 'var(--font-sans)',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'var(--color-primary-light)'
+                e.currentTarget.style.color = 'var(--color-primary)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'none'
+                e.currentTarget.style.color = 'var(--color-text-muted)'
+              }}
+            >
+              <Share2 size={18} strokeWidth={1.75} />
+              Share
+            </button>
           </div>
 
           {/* Profile nav card */}
@@ -462,22 +493,44 @@ function AppShell() {
             </div>
           )}
 
-          {/* Search button */}
-          <button
-            onClick={() => setSearchOpen(prev => !prev)}
-            aria-label="Search"
-            style={{
-              background: searchOpen ? 'var(--color-primary-light)' : 'none',
-              border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '36px', height: '36px',
-              borderRadius: 'var(--radius-sm)',
-              color: searchOpen ? 'var(--color-primary)' : 'var(--color-text-muted)',
-              transition: 'background 0.15s, color 0.15s',
-            }}
-          >
-            <Search size={20} strokeWidth={1.75} />
-          </button>
+          {/* Right-side icon buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+            {/* Share button — hidden when search overlay is open */}
+            {!searchOpen && (
+              <button
+                onClick={() => setShareOpen(prev => !prev)}
+                aria-label="Share"
+                style={{
+                  background: shareOpen ? 'var(--color-primary-light)' : 'none',
+                  border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '36px', height: '36px',
+                  borderRadius: 'var(--radius-sm)',
+                  color: shareOpen ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+              >
+                <Share2 size={20} strokeWidth={1.75} />
+              </button>
+            )}
+
+            {/* Search button */}
+            <button
+              onClick={() => { setSearchOpen(prev => !prev); setShareOpen(false) }}
+              aria-label="Search"
+              style={{
+                background: searchOpen ? 'var(--color-primary-light)' : 'none',
+                border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '36px', height: '36px',
+                borderRadius: 'var(--radius-sm)',
+                color: searchOpen ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+            >
+              <Search size={20} strokeWidth={1.75} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -508,6 +561,11 @@ function AppShell() {
         <MobileSearchOverlay onClose={() => setSearchOpen(false)} />
       )}
 
+      {/* ── Share modal (desktop + mobile) ───────────────── */}
+      {shareOpen && (
+        <ShareModal onClose={() => setShareOpen(false)} />
+      )}
+
       {/* ── Mobile bottom nav ────────────────────────────── */}
       {isMobile && (
         <nav style={{
@@ -524,7 +582,7 @@ function AppShell() {
               key={to}
               to={to}
               title={label}
-              onClick={() => setSearchOpen(false)}
+              onClick={() => { setSearchOpen(false); setShareOpen(false) }}
               style={({ isActive }) => ({
                 flex: 1,
                 display: 'flex',
