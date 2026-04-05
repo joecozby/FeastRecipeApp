@@ -6,7 +6,26 @@ import { scrapeUrl, scrapeInstagram } from '../services/scraper.js'
 import { parseRecipeText, parseRecipeImage } from '../services/aiParser.js'
 import { normalizeIngredient } from '../services/ingredientNormalizer.js'
 import { enqueueNutrition } from './nutritionWorker.js'
-import { attachCoverImage } from '../services/coverImageService.js'
+import { attachCoverImage, findAndAttachCoverImage } from '../services/coverImageService.js'
+
+// ---------------------------------------------------------------------------
+// Detect Instagram CDN URLs
+//
+// Instagram video posts (Reels) generate thumbnails with the play button and
+// title text baked directly into the pixel data — there is no way to strip
+// them.  Any URL served from Instagram's CDN will have this problem.
+// We detect these so we can fall back to a clean Unsplash food photo instead.
+// ---------------------------------------------------------------------------
+
+function isInstagramUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  return (
+    url.includes('cdninstagram.com') ||
+    url.includes('instagram.com')    ||
+    url.includes('fbcdn.net')        ||
+    /scontent[-.]/.test(url)
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Pipeline step: save parsed + normalized recipe to DB
@@ -136,7 +155,7 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
     if (scraped.ingredients.length > 0 && scraped.instructions.length > 0 && instructionsAreSplit) {
       logger.info('Import: JSON-LD extraction successful, skipping AI parse', { jobId })
       const recipeId = await saveRecipe(userId, scraped, sourceUrl, scraped)
-      return { recipeId, coverImageUrl: scraped.cover_image_url || null, ogImage: scraped.og_image || null }
+      return { recipeId, coverImageUrl: scraped.cover_image_url || null, ogImage: scraped.og_image || null, title: scraped.title || null }
     }
 
     if (scraped.ingredients.length > 0 && scraped.instructions.length > 0 && !instructionsAreSplit) {
@@ -166,7 +185,7 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
     const parsed = await parseRecipeImage(sourceInput) // sourceInput is the data URL
     const recipeId = await saveRecipe(userId, parsed, null, { type: 'photo' })
     // Use the uploaded photo as the cover image
-    return { recipeId, coverImageUrl: sourceInput, ogImage: null }
+    return { recipeId, coverImageUrl: sourceInput, ogImage: null, title: parsed.title || null }
   }
 
   // Step 2 — AI parse
@@ -190,7 +209,7 @@ async function processImportJob(jobId, userId, sourceType, sourceInput) {
 
   // Step 3 — Save
   const recipeId = await saveRecipe(userId, parsed, sourceUrl, { scraped, parsed })
-  return { recipeId, coverImageUrl: parsed.cover_image_url || null, ogImage: scraped?.og_image || null }
+  return { recipeId, coverImageUrl: parsed.cover_image_url || null, ogImage: scraped?.og_image || null, title: parsed.title || scraped?.title || null }
 }
 
 // ---------------------------------------------------------------------------
@@ -218,9 +237,9 @@ export function startImportWorker() {
         [jobId]
       )
 
-      let recipeId, coverImageUrl, ogImage
+      let recipeId, coverImageUrl, ogImage, recipeTitle
       try {
-        ;({ recipeId, coverImageUrl, ogImage } = await processImportJob(
+        ;({ recipeId, coverImageUrl, ogImage, title: recipeTitle } = await processImportJob(
           jobId,
           userId,
           dbJob.source_type,
@@ -251,8 +270,24 @@ export function startImportWorker() {
 
       logger.info('Import job complete', { jobId, recipeId })
       enqueueNutrition(recipeId).catch(err => logger.warn(`Failed to enqueue nutrition: ${err.message}`))
-      // Pass og_image as fallback — some CDN-hosted recipe images block direct download
-      attachCoverImage(recipeId, userId, coverImageUrl, ogImage)
+
+      // Instagram thumbnails (Reels / video posts) have the play button and title
+      // text baked into the image at the CDN level — impossible to strip.
+      // When the source is Instagram or the cover URL is from Instagram's CDN,
+      // search Unsplash for a clean food photo using the recipe title instead.
+      const coverIsInstagram =
+        dbJob.source_type === 'instagram' ||
+        isInstagramUrl(coverImageUrl) ||
+        isInstagramUrl(ogImage)
+
+      if (coverIsInstagram && process.env.UNSPLASH_ACCESS_KEY) {
+        logger.info('Cover image: Instagram source — using Unsplash for clean photo', { recipeId })
+        findAndAttachCoverImage(recipeId, userId, recipeTitle || 'food recipe')
+          .catch(err => logger.warn(`Unsplash cover fallback failed: ${err.message}`))
+      } else {
+        // Pass og_image as fallback — some CDN-hosted recipe images block direct download
+        attachCoverImage(recipeId, userId, coverImageUrl, ogImage)
+      }
 
       return { recipeId }
     },
