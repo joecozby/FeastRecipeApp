@@ -21,10 +21,10 @@ import type { RecipeSummary } from '../../api/recipes'
 import { ShareModal } from '../ui/ShareModal'
 
 const NAV_ITEMS = [
-  { to: '/recipes',       label: 'Recipes',       Icon: UtensilsCrossed },
   { to: '/import',        label: 'Import',        Icon: PlusCircle },
-  { to: '/search',        label: 'Search',        Icon: Search },
+  { to: '/recipes',       label: 'Recipes',       Icon: UtensilsCrossed },
   { to: '/cookbooks',     label: 'Cookbooks',     Icon: BookOpen },
+  { to: '/search',        label: 'Search',        Icon: Search },
   { to: '/grocery',       label: 'Grocery',       Icon: ShoppingCart },
   { to: '/spice-cabinet', label: 'Spice Cabinet', Icon: FlameKindling },
   { to: '/ai',            label: 'AI Chef',       Icon: Sparkles },
