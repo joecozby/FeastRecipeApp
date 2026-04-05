@@ -97,15 +97,50 @@ Return ONLY valid JSON matching this exact schema — no markdown, no explanatio
   }]
 }
 
-Rules:
-- raw_text must be the original ingredient string, unchanged
-- quantity must be a decimal number (convert fractions: 1/2 → 0.5)
-- unit must be fully spelled out (tbsp → tablespoon, tsp → teaspoon, etc.)
-- preparation is a cooking method applied to the ingredient (chopped, minced, etc.)
-- notes is anything in parentheses or after a comma that isn't quantity/unit/prep
-- is_optional is true if the ingredient is marked as optional
+Ingredient parsing rules — read carefully:
+
+QUANTITY
+- Convert fractions to decimals: 1/2 → 0.5, 1/4 → 0.25
+- For ranges like "4-5" or "1-2", use the average: (4+5)/2 = 4.5, (1+2)/2 = 1.5
+- Ignore ordinal suffixes: "1/4th tsp" → quantity 0.25, unit "teaspoon"
+
+UNIT
+- Fully spell out all abbreviations: tbsp → tablespoon, tsp → teaspoon, gm/g → gram, kg → kilogram, oz → ounce, lb → pound, ml → milliliter
+
+NAME — this is the most important field to get right:
+- name must contain ONLY the core ingredient word(s) — nothing else
+- NEVER include quantity, unit, or any abbreviation thereof in name ("cup", "gm", "tsp", "kg" etc. must NOT appear in name)
+- NEVER include the preparation term in name if it is already in the preparation field
+- NEVER include "optional", "as needed", "to taste", "if needed", or "to serve" in name
+- Correct common spelling errors: "dessicated" → "desiccated", "tumeric" → "turmeric"
+- Examples of correct name extraction:
+    "2 large onions, fried"        → name: "onions",  preparation: "fried"
+    "4-5 green chillies, slit"     → name: "green chillies", preparation: "slit"
+    "1/2 cup desiccated coconut"   → name: "desiccated coconut"  (no "cup" in name)
+    "250 gm yoghurt"               → name: "yoghurt"  (no "gm" in name)
+    "1/4th tsp red food color"     → name: "red food color"  (no "tsp" in name)
+    "1 kg chicken, cut into medium pieces" → name: "chicken", preparation: "cut into medium pieces"
+    "oil, as needed"               → name: "oil",  notes: null (not "oil as needed")
+    "salt, to taste"               → name: "salt", notes: null (not "salt to taste")
+    "juice of 1 lemon"             → name: "lemon juice", quantity: 1, notes: null
+
+PREPARATION
+- preparation is a cooking/prep method: chopped, fried, slit, minced, sliced, cut into pieces, etc.
+- Do NOT repeat the preparation term in name
+
+OPTIONAL / NOTES
+- is_optional = true if ingredient says "optional"; do NOT also put "optional" in notes
+- notes is for genuinely supplementary context (e.g. "available at Indian grocery stores")
+- Do NOT put "as needed", "to taste", "optional", or "if needed" in notes; those belong in is_optional or are stripped
+
+FAITHFULNESS
+- Extract ingredient names exactly as written — do not substitute similar ingredients
+- "lemon" ≠ "lime"; "cream" ≠ "milk"; extract what is written
+- raw_text must be the original ingredient string, completely unchanged
+
+OTHER
 - confidence is your certainty that the ingredient was correctly parsed (0-1)
-- ambiguous is true if the ingredient string was unclear
+- ambiguous is true if the ingredient string was genuinely unclear
 - instructions must be in order with sequential step_number values
 - tags should be lowercase, relevant meal-type or dietary labels only
 
@@ -124,6 +159,23 @@ Instruction group_label rules:
 - Do not force sections onto recipes that flow as one continuous process
 
 General group_label style: short, title-case, no trailing colon, no numbering`
+
+// ---------------------------------------------------------------------------
+// Unit words that should never appear at the start of an ingredient name
+// (belt-and-suspenders for when the AI accidentally includes them)
+// ---------------------------------------------------------------------------
+const UNIT_WORDS_IN_NAME = new Set([
+  'cup', 'cups', 'tablespoon', 'tablespoons', 'tbsp', 'tbsps',
+  'teaspoon', 'teaspoons', 'tsp', 'tsps',
+  'gram', 'grams', 'g', 'gm', 'gms',
+  'kilogram', 'kilograms', 'kg', 'kgs',
+  'ounce', 'ounces', 'oz',
+  'pound', 'pounds', 'lb', 'lbs',
+  'milliliter', 'milliliters', 'ml',
+  'liter', 'liters', 'l',
+  'pint', 'pints', 'pt',
+  'quart', 'quarts', 'qt',
+])
 
 // ---------------------------------------------------------------------------
 // Real Claude API call
@@ -213,14 +265,73 @@ function sanitizeParsed(parsed) {
     ...parsed,
     title:       decodeEntities(parsed.title),
     description: decodeEntities(parsed.description),
-    ingredients: (parsed.ingredients || []).map((ing) => ({
-      ...ing,
-      raw_text:    decodeEntities(ing.raw_text),
-      name:        decodeEntities(ing.name),
-      preparation: decodeEntities(ing.preparation),
-      notes:       decodeEntities(ing.notes),
-      group_label: decodeEntities(ing.group_label),
-    })),
+    ingredients: (parsed.ingredients || []).map((ing) => {
+      let name        = (decodeEntities(ing.name) || '').trim()
+      let notes       = decodeEntities(ing.notes)
+      const prep      = decodeEntities(ing.preparation)
+      const unit      = ing.unit || null
+
+      // --- Strip unit word from the start of name ---
+      // e.g. AI returned name="cup desiccated coconut" → "desiccated coconut"
+      //      name="gm yoghurt" → "yoghurt"
+      //      name="tsp red food color" → "red food color"
+      const nameWords = name.toLowerCase().split(/\s+/)
+      if (nameWords.length > 1 && UNIT_WORDS_IN_NAME.has(nameWords[0])) {
+        name = name.slice(nameWords[0].length).trim()
+      }
+      // Also catch: name="th tsp red food color" (ordinal suffix leftover)
+      if (/^(st|nd|rd|th)\s+/i.test(name)) {
+        name = name.replace(/^(st|nd|rd|th)\s+/i, '').trim()
+        // Then check again for unit word
+        const afterOrdinal = name.toLowerCase().split(/\s+/)
+        if (afterOrdinal.length > 1 && UNIT_WORDS_IN_NAME.has(afterOrdinal[0])) {
+          name = name.slice(afterOrdinal[0].length).trim()
+        }
+      }
+
+      // --- Strip prep term from end of name if AI duplicated it ---
+      // e.g. preparation="fried", name="large onions fried" → "large onions"
+      //      preparation="slit",  name="green chillies slit" → "green chillies"
+      if (prep) {
+        const prepLower = prep.toLowerCase()
+        const nameLower = name.toLowerCase()
+        if (nameLower.endsWith(prepLower)) {
+          name = name.slice(0, name.length - prepLower.length).trim().replace(/,\s*$/, '').trim()
+        }
+        // Also handle comma-separated: "green chillies, slit" with prep="slit"
+        const commaPrep = `,\\s*${prepLower.replace(/[-]/g, '[-]')}$`
+        name = name.replace(new RegExp(commaPrep, 'i'), '').trim()
+      }
+
+      // --- Strip "optional" from notes when is_optional=true (avoids duplication) ---
+      if (ing.is_optional && notes) {
+        notes = notes.replace(/\boptional\b/gi, '').replace(/^[,;\s]+|[,;\s]+$/g, '').trim() || null
+      }
+
+      // --- Strip "as needed" / "to taste" from name if AI put them there ---
+      name = name
+        .replace(/,?\s*\bto\s+taste\b/gi, '')
+        .replace(/,?\s*\bas\s+needed\b/gi, '')
+        .replace(/,?\s*\bif\s+needed\b/gi, '')
+        .replace(/,?\s*\boptional\b/gi, '')
+        .trim()
+        .replace(/,\s*$/, '')
+        .trim()
+
+      // --- Correct common spelling errors ---
+      name = name
+        .replace(/\bdessicated\b/gi, 'desiccated')
+        .replace(/\btumeric\b/gi, 'turmeric')
+
+      return {
+        ...ing,
+        raw_text:    decodeEntities(ing.raw_text),
+        name:        name || decodeEntities(ing.name), // keep original if cleaning emptied it
+        preparation: prep,
+        notes,
+        group_label: decodeEntities(ing.group_label),
+      }
+    }),
     instructions: (parsed.instructions || []).map((step) => ({
       ...step,
       body:        decodeEntities(step.body),

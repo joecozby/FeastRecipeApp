@@ -1,5 +1,5 @@
-import { NavLink, Outlet, Navigate } from 'react-router-dom'
-import { Suspense } from 'react'
+import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom'
+import { Suspense, useState, useRef, useEffect } from 'react'
 import {
   UtensilsCrossed,
   PlusCircle,
@@ -9,9 +9,14 @@ import {
   Sparkles,
   User,
   FlameKindling,
+  X,
+  ArrowLeft,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMobile } from '../../hooks/useMobile'
+import { useCookbooks, type CookbookSummary } from '../../api/cookbooks'
+import { useSearch } from '../../api/search'
+import type { RecipeSummary } from '../../api/recipes'
 
 const NAV_ITEMS = [
   { to: '/recipes',       label: 'Recipes',       Icon: UtensilsCrossed },
@@ -23,11 +28,9 @@ const NAV_ITEMS = [
   { to: '/ai',            label: 'AI Chef',       Icon: Sparkles },
 ]
 
-// Bottom nav — icons only so all 8 destinations fit on any phone width.
-// Matches the full sidebar nav so nothing is desktop-only.
+// Mobile bottom nav — Search removed; it lives in the top bar instead
 const BOTTOM_NAV_ITEMS = [
   { to: '/recipes',       Icon: UtensilsCrossed, label: 'Recipes'       },
-  { to: '/search',        Icon: Search,          label: 'Search'        },
   { to: '/import',        Icon: PlusCircle,      label: 'Import', primary: true },
   { to: '/cookbooks',     Icon: BookOpen,        label: 'Cookbooks'     },
   { to: '/grocery',       Icon: ShoppingCart,    label: 'Grocery'       },
@@ -35,6 +38,286 @@ const BOTTOM_NAV_ITEMS = [
   { to: '/spice-cabinet', Icon: FlameKindling,   label: 'Cabinet'       },
   { to: '/profile',       Icon: User,            label: 'Profile'       },
 ]
+
+// ---------------------------------------------------------------------------
+// Mobile search overlay
+// ---------------------------------------------------------------------------
+
+function MobileSearchOverlay({ onClose }: { onClose: () => void }) {
+  const [q, setQ] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const navigate = useNavigate()
+
+  // Cookbooks — client-side filter
+  const { data: allCookbooks } = useCookbooks()
+
+  // Recipes — API search (first page only for overlay)
+  const { data: searchData, isLoading: recipesLoading } = useSearch({ q: q.trim() || undefined })
+
+  useEffect(() => {
+    // Small delay so the transition doesn't fight with focus
+    const t = setTimeout(() => inputRef.current?.focus(), 80)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Close on back-button / escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const trimmed = q.trim()
+
+  const matchingCookbooks: CookbookSummary[] = trimmed
+    ? (allCookbooks ?? []).filter((cb: CookbookSummary) =>
+        cb.title.toLowerCase().includes(trimmed.toLowerCase())
+      )
+    : []
+
+  const allRecipes: RecipeSummary[] = searchData?.pages.flatMap((p: { data: RecipeSummary[] }) => p.data) ?? []
+
+  function goTo(path: string) {
+    navigate(path)
+    onClose()
+  }
+
+  const hasResults = matchingCookbooks.length > 0 || allRecipes.length > 0
+
+  return (
+    <div
+      style={{
+        position: 'fixed', top: '56px', left: 0, right: 0, bottom: 0,
+        background: 'var(--color-bg)',
+        zIndex: 98,
+        display: 'flex', flexDirection: 'column',
+        animation: 'slideDown 0.18s var(--ease-out)',
+      }}
+    >
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+      {/* ── Search input bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '10px',
+        padding: '10px 16px',
+        background: 'var(--color-surface)',
+        borderBottom: '1px solid var(--color-border)',
+        flexShrink: 0,
+      }}>
+        <Search size={17} color="var(--color-text-muted)" strokeWidth={2} style={{ flexShrink: 0 }} />
+        <input
+          ref={inputRef}
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Search recipes and cookbooks…"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          style={{
+            flex: 1,
+            border: 'none',
+            background: 'transparent',
+            fontSize: '16px', // 16px prevents iOS keyboard zoom
+            color: 'var(--color-text)',
+            fontFamily: 'var(--font-sans)',
+            outline: 'none',
+          }}
+        />
+        {q ? (
+          <button
+            onClick={() => setQ('')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--color-text-muted)', display: 'flex' }}
+          >
+            <X size={16} />
+          </button>
+        ) : null}
+      </div>
+
+      {/* ── Results ── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0 32px' }}>
+
+        {!trimmed ? (
+          <p style={{
+            fontSize: '14px', color: 'var(--color-text-muted)',
+            textAlign: 'center', padding: '48px 24px',
+          }}>
+            Search by recipe title, ingredient, cuisine, or cookbook name
+          </p>
+        ) : (
+          <>
+            {/* ── Cookbooks section ── */}
+            {matchingCookbooks.length > 0 && (
+              <section>
+                <p style={{
+                  fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '0.07em', color: 'var(--color-text-muted)',
+                  padding: '12px 20px 6px',
+                }}>
+                  Cookbooks
+                </p>
+                {matchingCookbooks.map(cb => (
+                  <button
+                    key={cb.id}
+                    onClick={() => goTo(`/cookbooks/${cb.id}`)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      width: '100%', padding: '10px 20px',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-silver)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    {/* Cookbook thumbnail */}
+                    {cb.cover_photos && cb.cover_photos.length > 0 ? (
+                      <img
+                        src={cb.cover_photos[0]}
+                        alt=""
+                        style={{
+                          width: '40px', height: '40px',
+                          borderRadius: 'var(--radius-sm)',
+                          objectFit: 'cover', flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '40px', height: '40px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '20px', flexShrink: 0,
+                      }}>📖</div>
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{
+                        fontSize: '14px', fontWeight: 500, color: 'var(--color-text)',
+                        margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {cb.title}
+                      </p>
+                      <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>
+                        {cb.recipe_count} recipe{cb.recipe_count === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    <BookOpen size={14} color="var(--color-text-muted)" style={{ marginLeft: 'auto', flexShrink: 0 }} />
+                  </button>
+                ))}
+              </section>
+            )}
+
+            {/* ── Recipes section ── */}
+            <section>
+              <p style={{
+                fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
+                letterSpacing: '0.07em', color: 'var(--color-text-muted)',
+                padding: '12px 20px 6px',
+              }}>
+                Recipes
+              </p>
+
+              {recipesLoading ? (
+                <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', padding: '12px 20px' }}>
+                  Searching…
+                </p>
+              ) : allRecipes.length === 0 ? (
+                <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', padding: '12px 20px' }}>
+                  No recipes found.
+                </p>
+              ) : (
+                allRecipes.map((recipe) => (
+                  <button
+                    key={recipe.id}
+                    onClick={() => goTo(`/recipes/${recipe.id}`)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      width: '100%', padding: '10px 20px',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-silver)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    {/* Recipe thumbnail */}
+                    {recipe.cover_url ? (
+                      <img
+                        src={recipe.cover_url}
+                        alt=""
+                        style={{
+                          width: '40px', height: '40px',
+                          borderRadius: 'var(--radius-sm)',
+                          objectFit: 'cover', flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '40px', height: '40px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'var(--color-silver)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '20px', flexShrink: 0,
+                      }}>🍽️</div>
+                    )}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p style={{
+                        fontSize: '14px', fontWeight: 500, color: 'var(--color-text)',
+                        margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {recipe.title}
+                      </p>
+                      {(recipe.cuisine || recipe.difficulty) && (
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>
+                          {[recipe.cuisine, recipe.difficulty].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                    <UtensilsCrossed size={14} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />
+                  </button>
+                ))
+              )}
+
+              {/* "See all" link when there are many results */}
+              {allRecipes.length >= 10 && (
+                <button
+                  onClick={() => goTo(`/search?q=${encodeURIComponent(trimmed)}`)}
+                  style={{
+                    display: 'block', width: '100%', padding: '12px 20px',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: '13px', color: 'var(--color-primary)', fontWeight: 600,
+                    textAlign: 'left', fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  See all results for "{trimmed}" →
+                </button>
+              )}
+            </section>
+
+            {/* Empty state when nothing at all matches */}
+            {!recipesLoading && !hasResults && (
+              <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                <p style={{ fontSize: '32px', marginBottom: '12px' }}>🔍</p>
+                <p style={{ fontSize: '15px', fontWeight: 600, marginBottom: '6px' }}>No results found</p>
+                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                  Try a different search term.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// PrivateRoute + AppShell
+// ---------------------------------------------------------------------------
 
 export function PrivateRoute() {
   const token = useAuthStore((s) => s.token)
@@ -44,6 +327,12 @@ export function PrivateRoute() {
 function AppShell() {
   const { user } = useAuthStore()
   const isMobile = useMobile()
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  // Close search overlay whenever we leave mobile (e.g. resize to desktop)
+  useEffect(() => {
+    if (!isMobile) setSearchOpen(false)
+  }, [isMobile])
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -147,17 +436,48 @@ function AppShell() {
           height: '56px',
           background: 'var(--color-surface)',
           borderBottom: '1px solid var(--color-border)',
-          display: 'flex', alignItems: 'center',
-          padding: '0 20px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 16px',
           zIndex: 100,
         }}>
-          <div style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '22px', fontWeight: 700,
-            color: 'var(--color-primary)', letterSpacing: '-0.5px',
-          }}>
-            Feast
-          </div>
+          {/* Wordmark — or back arrow when overlay is open */}
+          {searchOpen ? (
+            <button
+              onClick={() => setSearchOpen(false)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '8px',
+                color: 'var(--color-primary)', padding: '4px',
+              }}
+            >
+              <ArrowLeft size={20} strokeWidth={2} />
+            </button>
+          ) : (
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '22px', fontWeight: 700,
+              color: 'var(--color-primary)', letterSpacing: '-0.5px',
+            }}>
+              Feast
+            </div>
+          )}
+
+          {/* Search button */}
+          <button
+            onClick={() => setSearchOpen(prev => !prev)}
+            aria-label="Search"
+            style={{
+              background: searchOpen ? 'var(--color-primary-light)' : 'none',
+              border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '36px', height: '36px',
+              borderRadius: 'var(--radius-sm)',
+              color: searchOpen ? 'var(--color-primary)' : 'var(--color-text-muted)',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+          >
+            <Search size={20} strokeWidth={1.75} />
+          </button>
         </div>
       )}
 
@@ -168,6 +488,8 @@ function AppShell() {
         minHeight: '100vh',
         padding: isMobile ? '72px 16px 84px' : '32px',
         maxWidth: isMobile ? '100%' : 'calc(var(--content-max) + var(--nav-width))',
+        // Prevent scrolling behind overlay
+        overflow: isMobile && searchOpen ? 'hidden' : undefined,
       }}>
         <Suspense fallback={
           <div style={{
@@ -180,6 +502,11 @@ function AppShell() {
           <Outlet />
         </Suspense>
       </main>
+
+      {/* ── Mobile search overlay ────────────────────────── */}
+      {isMobile && searchOpen && (
+        <MobileSearchOverlay onClose={() => setSearchOpen(false)} />
+      )}
 
       {/* ── Mobile bottom nav ────────────────────────────── */}
       {isMobile && (
@@ -197,6 +524,7 @@ function AppShell() {
               key={to}
               to={to}
               title={label}
+              onClick={() => setSearchOpen(false)}
               style={({ isActive }) => ({
                 flex: 1,
                 display: 'flex',
@@ -208,7 +536,6 @@ function AppShell() {
               })}
             >
               {primary ? (
-                // Import gets a filled circle background to stand out as primary action
                 <div style={{
                   width: '36px', height: '36px', borderRadius: '50%',
                   background: 'var(--color-primary)',

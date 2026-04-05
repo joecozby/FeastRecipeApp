@@ -158,6 +158,7 @@ export default function RecipeDetailPage() {
   const { confirm, modal: confirmModal } = useConfirm()
   const [servings, setServings] = useState<number | null>(null)
   const [unitSystem, setUnitSystem] = useState<'original' | 'metric' | 'us'>('original')
+  const [mobileTab, setMobileTab] = useState<'ingredients' | 'instructions'>('ingredients')
   const [cookbookModal, setCookbookModal] = useState(false)
   const [groceryMsg, setGroceryMsg] = useState('')
 
@@ -347,14 +348,32 @@ export default function RecipeDetailPage() {
         </div>
       ) : null}
 
-      {/* Ingredients + Instructions — side by side on desktop, stacked on mobile */}
+      {/* Mobile tab toggle — Ingredients / Instructions */}
+      {isMobile && (
+        <div style={{ display: 'flex', background: 'var(--color-silver)', borderRadius: 'var(--radius-sm)', padding: '3px', gap: '2px', marginBottom: '20px', width: 'fit-content' }}>
+          {(['ingredients', 'instructions'] as const).map((tab) => (
+            <button key={tab} onClick={() => setMobileTab(tab)} style={{
+              padding: '6px 18px', borderRadius: 'calc(var(--radius-sm) - 2px)', border: 'none',
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+              background: mobileTab === tab ? 'var(--color-primary)' : 'transparent',
+              color: mobileTab === tab ? '#fff' : 'var(--color-text-muted)',
+              boxShadow: mobileTab === tab ? 'var(--shadow-sm)' : 'none',
+              transition: 'all 0.15s var(--ease-out)',
+            }}>
+              {tab === 'ingredients' ? 'Ingredients' : 'Instructions'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Ingredients + Instructions — side by side on desktop, tabbed on mobile */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: isMobile ? '1fr' : '240px 1fr',
         gap: isMobile ? '32px' : '40px',
         alignItems: 'start',
       }}>
-        <div>
+        <div style={{ display: isMobile && mobileTab !== 'ingredients' ? 'none' : undefined }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700 }}>Ingredients</h2>
             <div style={{ display: 'flex', background: 'var(--color-silver)', borderRadius: 'var(--radius-sm)', padding: '3px', gap: '2px', width: 'fit-content' }}>
@@ -407,7 +426,7 @@ export default function RecipeDetailPage() {
           ))}
         </div>
 
-        <div>
+        <div style={{ display: isMobile && mobileTab !== 'instructions' ? 'none' : undefined }}>
           <h2 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Instructions</h2>
           {instructionGroups.map(([group, steps]) => (
             <div key={group ?? '_'} style={{ marginBottom: '24px' }}>

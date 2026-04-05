@@ -40,27 +40,65 @@ const PREP_TERMS = [
   'cut into small pieces', 'cut into large pieces', 'cut into pieces',
   'cut into small cubes', 'cut into large cubes', 'cut into cubes',
   'cut into chunks', 'cut into florets', 'cut into rings', 'cut into wedges',
-  'cut into matchsticks', 'cut into bite-sized pieces', 'cut in half',
+  'cut into matchsticks', 'cut into bite-sized pieces', 'cut into medium pieces',
+  'cut into bite sized pieces', 'cut in half',
   'cut up', 'cut',
   'into thin strips', 'into thick strips', 'into strips',
-  'into small pieces', 'into large pieces', 'into pieces',
+  'into small pieces', 'into medium pieces', 'into large pieces', 'into pieces',
   'into cubes', 'into chunks', 'into florets', 'into rings', 'into wedges',
   'into matchsticks',
+  // Frying
+  'deep fried', 'shallow fried', 'pan fried', 'stir fried', 'stir-fried',
+  'lightly fried', 'well fried', 'fried',
+  // Boiling / cooking
+  'pressure cooked', 'half boiled', 'parboiled', 'boiled', 'steamed',
   // Standard prep verbs
   'finely chopped', 'roughly chopped', 'coarsely chopped', 'chopped',
   'thinly sliced', 'thickly sliced', 'sliced',
   'finely grated', 'coarsely grated', 'grated',
   'finely minced', 'minced',
+  'finely ground', 'coarsely ground', 'freshly ground', 'ground',
   'diced', 'shredded', 'julienned',
   'crushed', 'peeled', 'halved', 'quartered', 'cubed', 'torn',
   'trimmed', 'cleaned', 'rinsed', 'drained', 'patted dry',
   'softened', 'melted', 'room temperature',
-  'toasted', 'roasted', 'blanched', 'parboiled',
+  'toasted', 'roasted', 'blanched',
   'deveined', 'butterflied', 'scored', 'pounded',
   'separated', 'divided', 'sifted',
+  'soaked overnight', 'soaked',
+  'beaten', 'whisked', 'marinated',
+  'caramelized', 'caramelised',
+  'deseeded', 'destemmed',
+  'slit', 'split',
+  'washed',
 ]
 // Sort longest first so "finely chopped" matches before "chopped"
 PREP_TERMS.sort((a, b) => b.length - a.length)
+
+// ---------------------------------------------------------------------------
+// Common spelling corrections for ingredient names
+// ---------------------------------------------------------------------------
+const SPELLING_CORRECTIONS = {
+  dessicated: 'desiccated',
+  tumeric: 'turmeric',
+  chesse: 'cheese',
+  vineger: 'vinegar',
+  cinammon: 'cinnamon',
+  parsely: 'parsley',
+  refridgerated: 'refrigerated',
+}
+
+// ---------------------------------------------------------------------------
+// Phrases that describe quantity/condition — strip from name and move to notes
+// ---------------------------------------------------------------------------
+const INLINE_NOTES = [
+  { re: /,?\s*\bto\s+taste\b/gi,  note: 'to taste' },
+  { re: /,?\s*\bas\s+needed\b/gi, note: 'as needed' },
+  { re: /,?\s*\bif\s+needed\b/gi, note: 'if needed' },
+  { re: /,?\s*\bto\s+serve\b/gi,  note: 'to serve' },
+  { re: /,?\s*\bfor\s+garnish\b/gi, note: 'for garnish' },
+  { re: /,?\s*\boptional\b/gi,    note: null }, // strip only — is_optional handled by AI layer
+]
 
 // ---------------------------------------------------------------------------
 // Quantity parsing — handles fractions, unicode fractions, mixed numbers
@@ -110,27 +148,41 @@ export function parseRawText(rawText) {
   let text = rawText.trim()
 
   // --- 1. Extract quantity ---
+  // Check for range first ("4-5" or "1–2" → average) before the plain-integer
+  // pattern would grab only the first number.
+  // Exception: "1-1/2" style mixed numbers (have "/" in second part) are handled below.
   let quantity = null
-  const qtyPatterns = [
-    // Mixed number with unicode fraction: "1½"
-    /^([\d]+[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/,
-    // Mixed number: "1 1/2" or "1-1/2"
-    /^(\d+[\s-]+\d+\/\d+)/,
-    // Fraction: "1/2"
-    /^(\d+\/\d+)/,
-    // Unicode fraction only: "½"
-    /^([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/,
-    // Decimal or integer
-    /^([\d.]+)/,
-  ]
-  for (const pattern of qtyPatterns) {
-    const m = text.match(pattern)
-    if (m) {
-      quantity = parseQuantity(m[1])
-      text = text.slice(m[0].length).trim()
-      break
+  const rangeRe = /^(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)(?!\s*\/)/
+  const rangeM = text.match(rangeRe)
+  if (rangeM) {
+    quantity = (parseFloat(rangeM[1]) + parseFloat(rangeM[2])) / 2
+    text = text.slice(rangeM[0].length).trim()
+  } else {
+    const qtyPatterns = [
+      // Mixed number with unicode fraction: "1½"
+      /^([\d]+[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/,
+      // Mixed number: "1 1/2" or "1-1/2"
+      /^(\d+[\s-]+\d+\/\d+)/,
+      // Fraction: "1/2"
+      /^(\d+\/\d+)/,
+      // Unicode fraction only: "½"
+      /^([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/,
+      // Decimal or integer
+      /^([\d.]+)/,
+    ]
+    for (const pattern of qtyPatterns) {
+      const m = text.match(pattern)
+      if (m) {
+        quantity = parseQuantity(m[1])
+        text = text.slice(m[0].length).trim()
+        break
+      }
     }
   }
+
+  // Strip ordinal suffix that may follow a number (e.g. "1/4th" → strip "th",
+  // "2nd cup" → strip "nd") so the unit word is not blocked.
+  text = text.replace(/^(st|nd|rd|th)\b\s*/i, '')
 
   // --- 2. Extract unit ---
   let unit = null
@@ -151,6 +203,20 @@ export function parseRawText(rawText) {
     text = text.replace(notesMatch[0], '').trim()
   }
 
+  // --- 3.5. Move inline qualifier phrases out of name → notes ---
+  // e.g. "salt, to taste" → name "salt", notes "to taste"
+  //      "oil as needed" → name "oil", notes "as needed"
+  //      "red food color (optional)" → already handled by parens above;
+  //      bare "optional" → stripped (is_optional flag set by AI layer)
+  for (const { re, note } of INLINE_NOTES) {
+    re.lastIndex = 0
+    if (re.test(text)) {
+      if (note) notes = notes ? `${notes}; ${note}` : note
+      re.lastIndex = 0
+      text = text.replace(re, '').trim().replace(/,\s*$/, '').trim()
+    }
+  }
+
   // --- 4. Extract preparation terms ---
   let preparation = null
   const lc = text.toLowerCase()
@@ -166,11 +232,16 @@ export function parseRawText(rawText) {
   }
 
   // --- 5. Clean the remaining name ---
-  const name = text
+  let name = text
     .toLowerCase()
     .replace(/[^\w\s-]/g, '') // strip punctuation except hyphens
     .replace(/\s+/g, ' ')
     .trim()
+
+  // --- 5.5. Apply spelling corrections ---
+  for (const [wrong, right] of Object.entries(SPELLING_CORRECTIONS)) {
+    name = name.replace(new RegExp(`\\b${wrong}\\b`, 'gi'), right)
+  }
 
   return { quantity, unit, name, preparation, notes }
 }
