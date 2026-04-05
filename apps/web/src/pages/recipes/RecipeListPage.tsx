@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useFilterState } from '../../hooks/useFilterState'
 import { useMobile } from '../../hooks/useMobile'
+import { LibrarySelector } from '../../components/ui/LibrarySelector'
 
 type StatusFilter = 'all' | 'published' | 'draft'
 
@@ -45,7 +46,10 @@ export default function RecipeListPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: '24px',
       }}>
-        <h1 style={{ fontSize: isMobile ? '22px' : '26px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>My Recipes</h1>
+        {isMobile
+          ? <LibrarySelector active="recipes" />
+          : <h1 style={{ fontSize: '26px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>My Recipes</h1>
+        }
         {!isMobile && <Button onClick={() => navigate('/import')}>+ Import Recipe</Button>}
       </div>
 

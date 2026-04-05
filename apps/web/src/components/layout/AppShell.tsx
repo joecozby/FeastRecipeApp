@@ -1,4 +1,4 @@
-import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { Suspense, useState, useRef, useEffect } from 'react'
 import {
   UtensilsCrossed,
@@ -12,6 +12,7 @@ import {
   X,
   ArrowLeft,
   Send,
+  Library,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMobile } from '../../hooks/useMobile'
@@ -30,15 +31,16 @@ const NAV_ITEMS = [
   { to: '/ai',            label: 'AI Chef',       Icon: Sparkles },
 ]
 
-// Mobile bottom nav — Search removed; it lives in the top bar instead
+// Mobile bottom nav — Recipes + Cookbooks collapsed into one Library tab.
+// The Library tab links to /recipes by default; active state is handled
+// manually in the render so it highlights on both /recipes and /cookbooks.
 const BOTTOM_NAV_ITEMS = [
-  { to: '/recipes',       Icon: UtensilsCrossed, label: 'Recipes'       },
-  { to: '/import',        Icon: PlusCircle,      label: 'Import', primary: true },
-  { to: '/cookbooks',     Icon: BookOpen,        label: 'Cookbooks'     },
-  { to: '/grocery',       Icon: ShoppingCart,    label: 'Grocery'       },
-  { to: '/ai',            Icon: Sparkles,        label: 'AI Chef'       },
-  { to: '/spice-cabinet', Icon: FlameKindling,   label: 'Cabinet'       },
-  { to: '/profile',       Icon: User,            label: 'Profile'       },
+  { to: '/recipes',       Icon: Library,       label: 'Library', library: true },
+  { to: '/import',        Icon: PlusCircle,    label: 'Import',  primary: true },
+  { to: '/grocery',       Icon: ShoppingCart,  label: 'Grocery'              },
+  { to: '/ai',            Icon: Sparkles,      label: 'AI Chef'              },
+  { to: '/spice-cabinet', Icon: FlameKindling, label: 'Cabinet'              },
+  { to: '/profile',       Icon: User,          label: 'Profile'              },
 ]
 
 // ---------------------------------------------------------------------------
@@ -329,6 +331,7 @@ export function PrivateRoute() {
 function AppShell() {
   const { user } = useAuthStore()
   const isMobile = useMobile()
+  const location = useLocation()
   const [searchOpen, setSearchOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
 
@@ -577,7 +580,13 @@ function AppShell() {
           zIndex: 100,
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}>
-          {BOTTOM_NAV_ITEMS.map(({ to, Icon, label, primary }) => (
+          {BOTTOM_NAV_ITEMS.map(({ to, Icon, label, primary, library }) => {
+            // The Library tab is active on both /recipes and /cookbooks
+            const isLibraryActive = library
+              ? (location.pathname.startsWith('/recipes') || location.pathname.startsWith('/cookbooks'))
+              : false
+
+            return (
             <NavLink
               key={to}
               to={to}
@@ -588,7 +597,7 @@ function AppShell() {
                 display: 'flex',
                 alignItems: 'center', justifyContent: 'center',
                 textDecoration: 'none',
-                color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                color: (library ? isLibraryActive : isActive) ? 'var(--color-primary)' : 'var(--color-text-muted)',
                 transition: 'color 0.15s',
                 minWidth: 0,
               })}
@@ -605,7 +614,7 @@ function AppShell() {
                 <Icon size={22} strokeWidth={1.75} />
               )}
             </NavLink>
-          ))}
+          )})}
         </nav>
       )}
 

@@ -9,6 +9,8 @@ import { Input, Textarea } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { useConfirm } from '../../components/ui/ConfirmModal'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { useMobile } from '../../hooks/useMobile'
+import { LibrarySelector } from '../../components/ui/LibrarySelector'
 
 function reorder<T>(list: T[], fromIdx: number, toIdx: number): T[] {
   const next = [...list]
@@ -162,6 +164,7 @@ function CookbookCard({
 }
 
 export default function CookbooksPage() {
+  const isMobile = useMobile()
   const { data: cookbooks, isLoading } = useCookbooks()
   const createMutation = useCreateCookbook()
   const deleteMutation = useDeleteCookbook()
@@ -229,9 +232,12 @@ export default function CookbooksPage() {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Cookbooks</h1>
+          {isMobile
+            ? <LibrarySelector active="cookbooks" />
+            : <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Cookbooks</h1>
+          }
           {localCookbooks.length > 1 && (
-            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: isMobile ? '6px' : '4px' }}>
               Drag to reorder
             </p>
           )}
