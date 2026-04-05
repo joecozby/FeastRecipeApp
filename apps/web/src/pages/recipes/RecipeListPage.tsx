@@ -44,13 +44,18 @@ export default function RecipeListPage() {
     <div>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: '24px',
+        gap: '12px', marginBottom: '24px',
       }}>
         {isMobile
           ? <LibrarySelector active="recipes" />
           : <h1 style={{ fontSize: '26px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>My Recipes</h1>
         }
-        {!isMobile && <Button onClick={() => navigate('/import')}>+ Import Recipe</Button>}
+        <Button
+          onClick={() => navigate('/import')}
+          style={{ flexShrink: 0 }}
+        >
+          {isMobile ? '+ New' : '+ Import Recipe'}
+        </Button>
       </div>
 
       {/* Filter tabs */}

@@ -17,11 +17,12 @@ export function LibrarySelector({ active }: LibrarySelectorProps) {
     padding: 0,
     cursor: active === section ? 'default' : 'pointer',
     fontFamily: 'var(--font-display)',
-    fontSize: '22px',
+    fontSize: '20px',
     fontWeight: active === section ? 700 : 400,
     color: active === section ? 'var(--color-primary)' : 'var(--color-text-muted)',
     letterSpacing: active === section ? '-0.3px' : '0',
     lineHeight: 1.2,
+    whiteSpace: 'nowrap',
     transition: 'color 0.15s',
   } as React.CSSProperties)
 

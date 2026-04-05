@@ -230,19 +230,23 @@ export default function CookbooksPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
-        <div>
-          {isMobile
-            ? <LibrarySelector active="cookbooks" />
-            : <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Cookbooks</h1>
-          }
-          {localCookbooks.length > 1 && (
-            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: isMobile ? '6px' : '4px' }}>
-              Drag to reorder
-            </p>
-          )}
-        </div>
-        <Button onClick={() => setShowCreate(true)}>+ New Cookbook</Button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '28px' }}>
+        {isMobile
+          ? <LibrarySelector active="cookbooks" />
+          : (
+            <div>
+              <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Cookbooks</h1>
+              {localCookbooks.length > 1 && (
+                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                  Drag to reorder
+                </p>
+              )}
+            </div>
+          )
+        }
+        <Button onClick={() => setShowCreate(true)} style={{ flexShrink: 0 }}>
+          {isMobile ? '+ New' : '+ New Cookbook'}
+        </Button>
       </div>
 
       {isLoading ? (
