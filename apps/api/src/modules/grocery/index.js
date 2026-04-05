@@ -169,6 +169,23 @@ router.patch(
 )
 
 // ---------------------------------------------------------------------------
+// DELETE /api/grocery-lists/items/:id  — remove any single item (manual or recipe-sourced)
+// ---------------------------------------------------------------------------
+router.delete(
+  '/items/:id',
+  [param('id').isUUID(), validate],
+  asyncHandler(async (req, res) => {
+    const listId = await getOrCreateList(req.user.sub)
+    const { rowCount } = await pool.query(
+      `DELETE FROM grocery_list_items WHERE id = $1 AND grocery_list_id = $2`,
+      [req.params.id, listId]
+    )
+    if (!rowCount) throw new AppError('Item not found', 404)
+    res.status(204).send()
+  })
+)
+
+// ---------------------------------------------------------------------------
 // PATCH /api/grocery-lists/ingredient  — bulk check/uncheck by ingredient_key
 // Used by the Combined and By Category views to toggle all rows for an
 // ingredient across all recipes at once.

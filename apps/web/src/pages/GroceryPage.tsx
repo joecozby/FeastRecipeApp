@@ -5,7 +5,7 @@ import {
   useToggleGroceryItem,
   useToggleIngredientGroup,
   useAddManualGroceryItems,
-  useRemoveManualGroceryItem,
+  useDeleteGroceryItem,
   GroceryItem,
   GroceryRecipe,
 } from '../api/grocery'
@@ -405,11 +405,11 @@ function ViewToggle({ value, onChange }: { value: ViewMode; onChange: (v: ViewMo
 function MergedItemRow({
   entry,
   onToggle,
-  onRemoveManual,
+  onDelete,
 }: {
   entry: MergedEntry
   onToggle: (key: string, val: boolean) => void
-  onRemoveManual?: (ids: string[]) => void
+  onDelete: (ids: string[]) => void
 }) {
   const qtyLabel = formatQty(entry.quantity, entry.unit)
   return (
@@ -455,23 +455,21 @@ function MergedItemRow({
           </span>
         )}
       </label>
-      {entry.is_manual && onRemoveManual && (
-        <button
-          onClick={() => onRemoveManual(entry.item_ids)}
-          title="Remove item"
-          style={{
-            background: 'none', border: 'none',
-            color: '#dc2626', cursor: 'pointer',
-            fontSize: '20px', lineHeight: 1,
-            padding: '6px 8px', flexShrink: 0,
-            opacity: 0.75,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.75' }}
-        >
-          ×
-        </button>
-      )}
+      <button
+        onClick={() => onDelete(entry.item_ids)}
+        title="Remove item"
+        style={{
+          background: 'none', border: 'none',
+          color: '#dc2626', cursor: 'pointer',
+          fontSize: '20px', lineHeight: 1,
+          padding: '6px 8px', flexShrink: 0,
+          opacity: 0.6,
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6' }}
+      >
+        ×
+      </button>
     </div>
   )
 }
@@ -480,6 +478,7 @@ function MergedItemRow({
 function SingleItemRow({
   item,
   onToggle,
+  onDelete,
   ownedMasterIds,
   onAddToCabinet,
   dismissedSuggestions,
@@ -487,6 +486,7 @@ function SingleItemRow({
 }: {
   item: GroceryItem
   onToggle: (id: string, val: boolean) => void
+  onDelete: (id: string) => void
   ownedMasterIds: Set<number>
   onAddToCabinet: (masterId: number) => void
   dismissedSuggestions: Set<number>
@@ -506,9 +506,9 @@ function SingleItemRow({
     !dismissedSuggestions.has(item.spice_cabinet_master_id!)
 
   return (
-    <div>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
       <label style={{
-        display: 'flex', alignItems: 'center', gap: '12px',
+        flex: 1, display: 'flex', alignItems: 'center', gap: '12px',
         padding: '11px 14px', background: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
         borderRadius: showSuggestion ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)',
@@ -587,6 +587,21 @@ function SingleItemRow({
           </button>
         </div>
       )}
+      <button
+        onClick={() => onDelete(item.id)}
+        title="Remove item"
+        style={{
+          background: 'none', border: 'none',
+          color: '#dc2626', cursor: 'pointer',
+          fontSize: '20px', lineHeight: 1,
+          padding: '6px 8px', flexShrink: 0,
+          marginTop: '6px', opacity: 0.6,
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6' }}
+      >
+        ×
+      </button>
     </div>
   )
 }
@@ -618,7 +633,7 @@ export default function GroceryPage() {
   const toggleItem = useToggleGroceryItem()
   const toggleGroup = useToggleIngredientGroup()
   const addManualItems = useAddManualGroceryItems()
-  const removeManualItem = useRemoveManualGroceryItem()
+  const deleteItem = useDeleteGroceryItem()
   const navigate = useNavigate()
   const [viewMode, setViewMode] = useState<ViewMode>('combined')
   const [addText, setAddText] = useState('')
@@ -842,7 +857,7 @@ export default function GroceryPage() {
             <CombinedView
               items={items}
               onToggleGroup={(key, val) => toggleGroup.mutate({ ingredient_key: key, is_checked: val })}
-              onRemoveManual={(ids) => ids.forEach((id) => removeManualItem.mutate(id))}
+              onDelete={(ids) => ids.forEach((id) => deleteItem.mutate(id))}
             />
           )}
           {viewMode === 'by-recipe' && (
@@ -850,6 +865,7 @@ export default function GroceryPage() {
               items={items}
               recipes={recipes}
               onToggleItem={(id, val) => toggleItem.mutate({ id, is_checked: val })}
+              onDeleteItem={(id) => deleteItem.mutate(id)}
               ownedMasterIds={ownedMasterIds}
               onAddToCabinet={handleAddToCabinet}
               dismissedSuggestions={dismissedSuggestions}
@@ -860,7 +876,7 @@ export default function GroceryPage() {
             <ByCategoryView
               items={items}
               onToggleGroup={(key, val) => toggleGroup.mutate({ ingredient_key: key, is_checked: val })}
-              onRemoveManual={(ids) => ids.forEach((id) => removeManualItem.mutate(id))}
+              onDelete={(ids) => ids.forEach((id) => deleteItem.mutate(id))}
             />
           )}
         </>
@@ -880,11 +896,11 @@ export default function GroceryPage() {
 function CombinedView({
   items,
   onToggleGroup,
-  onRemoveManual,
+  onDelete,
 }: {
   items: GroceryItem[]
   onToggleGroup: (key: string, val: boolean) => void
-  onRemoveManual: (ids: string[]) => void
+  onDelete: (ids: string[]) => void
 }) {
   const combined = buildCombined(items)
   const unchecked = combined.filter((e) => !e.is_checked)
@@ -897,7 +913,7 @@ function CombinedView({
           <SectionHeader label="To buy" count={unchecked.length} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {unchecked.map((entry) => (
-              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onRemoveManual={onRemoveManual} />
+              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onDelete={onDelete} />
             ))}
           </div>
         </div>
@@ -907,7 +923,7 @@ function CombinedView({
           <SectionHeader label="In cart" count={checked.length} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {checked.map((entry) => (
-              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onRemoveManual={onRemoveManual} />
+              <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onDelete={onDelete} />
             ))}
           </div>
         </div>
@@ -924,6 +940,7 @@ function ByRecipeView({
   items,
   recipes,
   onToggleItem,
+  onDeleteItem,
   ownedMasterIds,
   onAddToCabinet,
   dismissedSuggestions,
@@ -932,6 +949,7 @@ function ByRecipeView({
   items: GroceryItem[]
   recipes: GroceryRecipe[]
   onToggleItem: (id: string, val: boolean) => void
+  onDeleteItem: (id: string) => void
   ownedMasterIds: Set<number>
   onAddToCabinet: (masterId: number) => void
   dismissedSuggestions: Set<number>
@@ -966,6 +984,7 @@ function ByRecipeView({
                   key={item.id}
                   item={item}
                   onToggle={onToggleItem}
+                  onDelete={onDeleteItem}
                   ownedMasterIds={ownedMasterIds}
                   onAddToCabinet={onAddToCabinet}
                   dismissedSuggestions={dismissedSuggestions}
@@ -977,6 +996,7 @@ function ByRecipeView({
                   key={item.id}
                   item={item}
                   onToggle={onToggleItem}
+                  onDelete={onDeleteItem}
                   ownedMasterIds={ownedMasterIds}
                   onAddToCabinet={onAddToCabinet}
                   dismissedSuggestions={dismissedSuggestions}
@@ -998,11 +1018,11 @@ function ByRecipeView({
 function ByCategoryView({
   items,
   onToggleGroup,
-  onRemoveManual,
+  onDelete,
 }: {
   items: GroceryItem[]
   onToggleGroup: (key: string, val: boolean) => void
-  onRemoveManual: (ids: string[]) => void
+  onDelete: (ids: string[]) => void
 }) {
   const categories = buildByCategory(items)
 
@@ -1017,10 +1037,10 @@ function ByCategoryView({
             <SectionHeader label={category} count={total} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {unchecked.map((entry) => (
-                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onRemoveManual={onRemoveManual} />
+                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onDelete={onDelete} />
               ))}
               {checked.map((entry) => (
-                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onRemoveManual={onRemoveManual} />
+                <MergedItemRow key={entry.ingredient_key} entry={entry} onToggle={onToggleGroup} onDelete={onDelete} />
               ))}
             </div>
           </div>

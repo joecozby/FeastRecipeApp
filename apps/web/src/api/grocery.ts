@@ -127,3 +127,26 @@ export function useToggleIngredientGroup() {
     onSettled: () => qc.invalidateQueries({ queryKey: ['grocery'] }),
   })
 }
+
+// Delete any item (manual or recipe-sourced) by id — optimistic remove
+export function useDeleteGroceryItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => client.delete(`/grocery-lists/items/${id}`),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ['grocery'] })
+      const prev = qc.getQueryData<GroceryList>(['grocery'])
+      if (prev) {
+        qc.setQueryData(['grocery'], {
+          ...prev,
+          items: prev.items.filter((item) => item.id !== id),
+        })
+      }
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['grocery'], ctx.prev)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['grocery'] }),
+  })
+}
