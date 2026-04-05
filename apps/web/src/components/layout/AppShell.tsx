@@ -11,7 +11,7 @@ import {
   FlameKindling,
   X,
   ArrowLeft,
-  Share2,
+  Send,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMobile } from '../../hooks/useMobile'
@@ -418,7 +418,7 @@ function AppShell() {
                 e.currentTarget.style.color = 'var(--color-text-muted)'
               }}
             >
-              <Share2 size={18} strokeWidth={1.75} />
+              <Send size={18} strokeWidth={1.75} />
               Share
             </button>
           </div>
@@ -510,7 +510,7 @@ function AppShell() {
                   transition: 'background 0.15s, color 0.15s',
                 }}
               >
-                <Share2 size={20} strokeWidth={1.75} />
+                <Send size={20} strokeWidth={1.75} />
               </button>
             )}
 

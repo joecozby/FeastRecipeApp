@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import { X, Copy, Check, Share2 } from 'lucide-react'
+import { X, Copy, Check, Send } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Context detection — what page is the user on?
@@ -120,7 +120,7 @@ export function ShareModal({ onClose }: ShareModalProps) {
           marginBottom: '20px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Share2 size={17} color="var(--color-primary)" />
+            <Send size={17} color="var(--color-primary)" />
             <span style={{ fontSize: '16px', fontWeight: 700 }}>Share</span>
           </div>
           <button
@@ -215,7 +215,7 @@ export function ShareModal({ onClose }: ShareModalProps) {
               marginTop: '8px',
             }}
           >
-            <Share2 size={15} />
+            <Send size={15} />
             Share via…
           </button>
         )}
