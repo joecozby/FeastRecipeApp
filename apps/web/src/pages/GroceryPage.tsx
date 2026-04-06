@@ -802,7 +802,7 @@ export default function GroceryPage() {
               handleAddManual()
             }
           }}
-          placeholder={'e.g. 2 cups flour, 3 large eggs, 1 lb butter'}
+          placeholder={'e.g. 5 apples, 1 lb turkey meat, 2 gallons of milk'}
           rows={2}
           style={{
             width: '100%', boxSizing: 'border-box',
