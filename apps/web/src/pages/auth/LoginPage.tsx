@@ -47,7 +47,7 @@ export default function LoginPage() {
         border: '1px solid var(--color-border)',
       }}>
         <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '4px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '4px', fontFamily: 'var(--font-display)' }}>
             Feast
           </h1>
           <p style={{ fontSize: '15px', color: 'var(--color-text-muted)' }}>

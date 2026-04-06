@@ -17,12 +17,20 @@ export interface RecipeSummary {
   cover_url: string | null
   created_at: string
   updated_at: string
+  // Social fields — present on feed/saved results
+  owner_id?: string
+  owner_name?: string | null
+  is_saved?: boolean
+  is_owner?: boolean
 }
 
 export interface RecipeDetail extends RecipeSummary {
   description: string | null
   source_url: string | null
   owner_name: string | null
+  owner_id: string
+  is_owner: boolean
+  is_saved: boolean
   ingredients: RecipeIngredient[]
   instructions: Instruction[]
   tags: Tag[]
@@ -58,13 +66,25 @@ export interface Tag {
 // Queries
 // ---------------------------------------------------------------------------
 
-export function useRecipes(params?: { status?: string }) {
+export function useRecipes(params?: { status?: string }, options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: ['recipes', params],
     queryFn: ({ pageParam }) =>
       client.get('/recipes', { params: { ...params, cursor: pageParam, limit: 24 } }).then((r) => r.data),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.cursor ?? undefined,
+    enabled: options?.enabled !== false,
+  })
+}
+
+export function useFeed(options?: { enabled?: boolean }) {
+  return useInfiniteQuery({
+    queryKey: ['feed'],
+    queryFn: ({ pageParam }) =>
+      client.get('/feed', { params: { cursor: pageParam, limit: 20 } }).then((r) => r.data),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.cursor ?? undefined,
+    enabled: options?.enabled !== false,
   })
 }
 
@@ -130,6 +150,30 @@ export function useDeleteRecipe() {
   return useMutation({
     mutationFn: (id: string) => client.delete(`/recipes/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['recipes'] }),
+  })
+}
+
+export function useSaveRecipe() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => client.post(`/recipes/${id}/save`).then((r) => r.data),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['feed'] })
+      qc.invalidateQueries({ queryKey: ['recipes', { status: 'saved' }] })
+      qc.invalidateQueries({ queryKey: ['recipes', id] })
+    },
+  })
+}
+
+export function useUnsaveRecipe() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => client.delete(`/recipes/${id}/save`).then((r) => r.data),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['feed'] })
+      qc.invalidateQueries({ queryKey: ['recipes', { status: 'saved' }] })
+      qc.invalidateQueries({ queryKey: ['recipes', id] })
+    },
   })
 }
 

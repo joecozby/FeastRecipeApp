@@ -107,7 +107,7 @@ export default function CookbookDetailPage() {
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '8px' }}>
         <div>
-          <h1 style={{ fontSize: '26px', fontWeight: 700 }}>{cookbook.title}</h1>
+          <h1 style={{ fontSize: '26px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>{cookbook.title}</h1>
           {cookbook.description && (
             <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginTop: '6px', maxWidth: '560px', lineHeight: 1.6 }}>
               {cookbook.description}

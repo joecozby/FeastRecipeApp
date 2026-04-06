@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useRecipes } from '../../api/recipes'
+import { useRecipes, useFeed } from '../../api/recipes'
 import { RecipeCard } from '../../components/ui/RecipeCard'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -8,37 +8,162 @@ import { useFilterState } from '../../hooks/useFilterState'
 import { useMobile } from '../../hooks/useMobile'
 import { LibrarySelector } from '../../components/ui/LibrarySelector'
 
-type StatusFilter = 'all' | 'published' | 'draft'
+type TabFilter = 'feed' | 'all' | 'published' | 'draft' | 'saved'
 
-const FILTER_TABS: { value: StatusFilter; label: string }[] = [
+const FILTER_TABS: { value: TabFilter; label: string }[] = [
+  { value: 'feed',      label: 'Feed' },
   { value: 'all',       label: 'All' },
-  { value: 'published', label: 'Published' },
-  { value: 'draft',     label: 'Drafts' },
+  { value: 'published', label: 'Public' },
+  { value: 'draft',     label: 'Private' },
+  { value: 'saved',     label: 'Saved' },
 ]
+
+// ---------------------------------------------------------------------------
+// Shared skeleton + infinite scroll helpers
+// ---------------------------------------------------------------------------
+
+function useInfiniteScroll(isFetching: boolean, hasNext: boolean, fetchNext: () => void) {
+  const observer = useRef<IntersectionObserver | null>(null)
+  return useCallback(
+    (node: HTMLDivElement | null) => {
+      if (isFetching) return
+      if (observer.current) observer.current.disconnect()
+      if (!node) return
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasNext) fetchNext()
+      })
+      observer.current.observe(node)
+    },
+    [isFetching, hasNext, fetchNext]
+  )
+}
+
+const GRID_STYLE = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+  gap: '20px',
+} as const
+
+// ---------------------------------------------------------------------------
+// Feed section — public recipes from other users
+// ---------------------------------------------------------------------------
+
+function FeedSection() {
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useFeed()
+  const sentinelRef = useInfiniteScroll(isFetchingNextPage, hasNextPage ?? false, fetchNextPage)
+
+  const allRecipes = data?.pages.flatMap((p) => p.data) ?? []
+
+  if (isLoading) return <RecipeGridSkeleton />
+
+  if (allRecipes.length === 0) {
+    return (
+      <EmptyState
+        icon="🍳"
+        title="Nothing in the feed yet"
+        description="When other users make their recipes public, they'll appear here."
+      />
+    )
+  }
+
+  return (
+    <>
+      <div style={GRID_STYLE}>
+        {allRecipes.map((recipe) => (
+          <RecipeCard key={recipe.id} recipe={recipe} showSave />
+        ))}
+      </div>
+      <div ref={sentinelRef} style={{ height: '40px', marginTop: '16px' }} />
+      {isFetchingNextPage && (
+        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '14px' }}>
+          Loading more...
+        </p>
+      )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Library section — own recipes (all / public / private) or saved
+// ---------------------------------------------------------------------------
+
+function LibrarySection({ tab }: { tab: 'all' | 'published' | 'draft' | 'saved' }) {
+  const navigate = useNavigate()
+  const status = tab === 'all' ? undefined : tab
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } =
+    useRecipes(status ? { status } : {})
+  const sentinelRef = useInfiniteScroll(isFetchingNextPage, hasNextPage ?? false, fetchNextPage)
+
+  const allRecipes = data?.pages.flatMap((p) => p.data) ?? []
+
+  if (isLoading) return <RecipeGridSkeleton />
+
+  if (allRecipes.length === 0) {
+    if (tab === 'saved') {
+      return (
+        <EmptyState
+          icon="🔖"
+          title="No saved recipes"
+          description="Browse the Feed and save recipes from other users to see them here."
+        />
+      )
+    }
+    if (tab === 'published') {
+      return (
+        <EmptyState
+          icon="🌐"
+          title="No public recipes"
+          description="Make a recipe public so it appears in the community Feed."
+          action={<Button onClick={() => navigate('/import')}>Import a Recipe</Button>}
+        />
+      )
+    }
+    if (tab === 'draft') {
+      return (
+        <EmptyState
+          icon="🔒"
+          title="No private recipes"
+          description="Private recipes are visible only to you."
+        />
+      )
+    }
+    return (
+      <EmptyState
+        icon="🍽"
+        title="No recipes yet"
+        description="Import your first recipe from a URL, Instagram post, or pasted text."
+        action={<Button onClick={() => navigate('/import')}>Import your first recipe</Button>}
+      />
+    )
+  }
+
+  const showSave = tab === 'saved'
+
+  return (
+    <>
+      <div style={GRID_STYLE}>
+        {allRecipes.map((recipe) => (
+          <RecipeCard key={recipe.id} recipe={recipe} showSave={showSave} />
+        ))}
+      </div>
+      <div ref={sentinelRef} style={{ height: '40px', marginTop: '16px' }} />
+      {isFetchingNextPage && (
+        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '14px' }}>
+          Loading more...
+        </p>
+      )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function RecipeListPage() {
   const navigate = useNavigate()
   const isMobile = useMobile()
-  const [status, setStatus] = useFilterState<StatusFilter>('status', 'all')
-
-  const queryParams = status === 'all' ? {} : { status }
-  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useRecipes(queryParams)
-
-  const observer = useRef<IntersectionObserver | null>(null)
-  const sentinelRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (isFetchingNextPage) return
-      if (observer.current) observer.current.disconnect()
-      if (!node) return
-      observer.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasNextPage) fetchNextPage()
-      })
-      observer.current.observe(node)
-    },
-    [isFetchingNextPage, hasNextPage, fetchNextPage]
-  )
-
-  const allRecipes = data?.pages.flatMap((p) => p.data) ?? []
+  const [tab, setTab] = useFilterState<TabFilter>('tab', 'feed')
 
   return (
     <div>
@@ -64,53 +189,29 @@ export default function RecipeListPage() {
         background: 'var(--color-silver)', padding: '4px',
         borderRadius: 'var(--radius-md)', width: 'fit-content',
       }}>
-        {FILTER_TABS.map((tab) => (
+        {FILTER_TABS.map((t) => (
           <button
-            key={tab.value}
-            onClick={() => setStatus(tab.value)}
+            key={t.value}
+            onClick={() => setTab(t.value)}
             style={{
               padding: '6px 16px', borderRadius: 'var(--radius-sm)',
               border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
               fontFamily: 'var(--font-sans)',
-              background: status === tab.value ? 'var(--color-primary)' : 'transparent',
-              color: status === tab.value ? '#fff' : 'var(--color-text-muted)',
-              boxShadow: status === tab.value ? 'var(--shadow-sm)' : 'none',
+              background: tab === t.value ? 'var(--color-primary)' : 'transparent',
+              color: tab === t.value ? '#fff' : 'var(--color-text-muted)',
+              boxShadow: tab === t.value ? 'var(--shadow-sm)' : 'none',
               transition: 'all 0.15s var(--ease-out)',
             }}
           >
-            {tab.label}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {isLoading ? (
-        <RecipeGridSkeleton />
-      ) : allRecipes.length === 0 ? (
-        <EmptyState
-          icon="🍽"
-          title="No recipes yet"
-          description="Import your first recipe from a URL, Instagram post, or paste the text directly."
-          action={<Button onClick={() => navigate('/import')}>Import your first recipe</Button>}
-        />
-      ) : (
-        <>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-            gap: '20px',
-          }}>
-            {allRecipes.map((recipe) => (
-              <RecipeCard key={recipe.id} recipe={recipe} />
-            ))}
-          </div>
-          <div ref={sentinelRef} style={{ height: '40px', marginTop: '16px' }} />
-          {isFetchingNextPage && (
-            <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '14px' }}>
-              Loading more...
-            </p>
-          )}
-        </>
-      )}
+      {tab === 'feed'
+        ? <FeedSection />
+        : <LibrarySection tab={tab} />
+      }
     </div>
   )
 }

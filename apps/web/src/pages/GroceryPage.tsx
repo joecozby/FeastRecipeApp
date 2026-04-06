@@ -687,7 +687,7 @@ export default function GroceryPage() {
 
   return (
     <div style={{ maxWidth: '640px' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '6px' }}>Grocery List</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '6px', fontFamily: 'var(--font-display)' }}>Grocery List</h1>
       <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>
         {subtitles[viewMode]}
       </p>

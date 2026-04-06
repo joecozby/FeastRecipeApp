@@ -78,7 +78,7 @@ export default function AiPage() {
       // Desktop: original calc works fine since there's no top/bottom bar.
       height: isMobile ? 'calc(100dvh - 156px)' : 'calc(100vh - 64px)',
     }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px' }}>AI Chef</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px', fontFamily: 'var(--font-display)' }}>AI Chef</h1>
       <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
         Ask cooking questions, create recipes, pick meals from your cookbooks, or say "add these to my grocery list."
       </p>

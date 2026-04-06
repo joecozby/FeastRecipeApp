@@ -274,7 +274,7 @@ export default function ImportPage() {
 
   return (
     <div style={{ maxWidth: '600px' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Import a Recipe</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px', fontFamily: 'var(--font-display)' }}>Import a Recipe</h1>
       <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginBottom: '32px' }}>
         Import from a website URL, Instagram post, pasted text, or a photo of a recipe book.
       </p>

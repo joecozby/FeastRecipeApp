@@ -103,7 +103,7 @@ export default function ProfilePage() {
 
   return (
     <div style={{ maxWidth: '520px' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '28px' }}>Profile</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '28px', fontFamily: 'var(--font-display)' }}>Profile</h1>
 
       {/* Avatar + name card */}
       <div style={{

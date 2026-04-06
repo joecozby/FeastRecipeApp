@@ -185,7 +185,7 @@ export default function RecipeEditPage() {
         ← Back to recipe
       </Link>
 
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '28px' }}>Edit Recipe</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '28px', fontFamily: 'var(--font-display)' }}>Edit Recipe</h1>
 
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 

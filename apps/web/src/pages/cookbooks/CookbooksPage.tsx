@@ -235,7 +235,7 @@ export default function CookbooksPage() {
           ? <LibrarySelector active="cookbooks" />
           : (
             <div>
-              <h1 style={{ fontSize: '24px', fontWeight: 700 }}>Cookbooks</h1>
+              <h1 style={{ fontSize: '24px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>Cookbooks</h1>
               {localCookbooks.length > 1 && (
                 <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                   Drag to reorder

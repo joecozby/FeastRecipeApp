@@ -15,6 +15,7 @@ import mediaRouter from './modules/media/index.js'
 import aiRouter from './modules/ai/index.js'
 import spiceCabinetRouter from './modules/spiceCabinet/index.js'
 import instacartRouter from './modules/instacart/index.js'
+import feedRouter from './modules/feed/index.js'
 
 const app = express()
 
@@ -53,6 +54,7 @@ app.use('/api/media', mediaRouter)
 app.use('/api/ai', aiRouter)
 app.use('/api/spice-cabinet', spiceCabinetRouter)
 app.use('/api/instacart', instacartRouter)
+app.use('/api/feed', feedRouter)
 
 // 404 handler for unmatched API routes
 app.use('/api/*', (_req, res) => {

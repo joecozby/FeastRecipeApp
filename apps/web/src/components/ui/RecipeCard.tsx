@@ -1,8 +1,12 @@
 import { Link } from 'react-router-dom'
+import { Bookmark } from 'lucide-react'
 import type { RecipeSummary } from '../../api/recipes'
+import { useSaveRecipe, useUnsaveRecipe } from '../../api/recipes'
 
 interface RecipeCardProps {
   recipe: RecipeSummary
+  /** Show save/unsave bookmark button (for feed & saved views) */
+  showSave?: boolean
 }
 
 const DIFFICULTY_STYLE: Record<string, { bg: string; color: string }> = {
@@ -19,7 +23,51 @@ function formatTime(mins: number | null): string | null {
   return m ? `${h}h ${m}m` : `${h}h`
 }
 
-export function RecipeCard({ recipe }: RecipeCardProps) {
+function SaveButton({ recipeId, isSaved }: { recipeId: string; isSaved: boolean }) {
+  const saveMutation = useSaveRecipe()
+  const unsaveMutation = useUnsaveRecipe()
+  const pending = saveMutation.isPending || unsaveMutation.isPending
+
+  function toggle(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (pending) return
+    if (isSaved) unsaveMutation.mutate(recipeId)
+    else saveMutation.mutate(recipeId)
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      title={isSaved ? 'Unsave recipe' : 'Save recipe'}
+      style={{
+        position: 'absolute', top: '10px', right: '10px',
+        width: '32px', height: '32px', borderRadius: '50%',
+        background: 'rgba(0,0,0,0.45)',
+        backdropFilter: 'blur(4px)',
+        border: 'none', cursor: pending ? 'default' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: isSaved ? '#f59e0b' : '#fff',
+        transition: 'background 0.15s, color 0.15s',
+        opacity: pending ? 0.6 : 1,
+      }}
+      onMouseEnter={(e) => {
+        if (!pending) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,0,0,0.65)'
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,0,0,0.45)'
+      }}
+    >
+      <Bookmark
+        size={15}
+        fill={isSaved ? 'currentColor' : 'none'}
+        strokeWidth={2}
+      />
+    </button>
+  )
+}
+
+export function RecipeCard({ recipe, showSave }: RecipeCardProps) {
   const totalTime = formatTime((recipe.prep_time_mins ?? 0) + (recipe.cook_time_mins ?? 0))
   const diffStyle = recipe.difficulty ? DIFFICULTY_STYLE[recipe.difficulty] : null
 
@@ -68,12 +116,28 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
               borderRadius: 'var(--radius-full)',
               textTransform: 'uppercase', letterSpacing: '0.08em',
               fontFamily: 'var(--font-sans)',
-            }}>Draft</span>
+            }}>Private</span>
+          )}
+          {showSave && (
+            <SaveButton
+              recipeId={recipe.id}
+              isSaved={recipe.is_saved ?? false}
+            />
           )}
         </div>
 
         {/* Content */}
         <div style={{ padding: '14px 16px 16px' }}>
+          {/* Owner name — shown for feed/saved cards */}
+          {recipe.owner_name && (
+            <p style={{
+              fontSize: '11px', color: 'var(--color-text-muted)',
+              marginBottom: '5px', fontFamily: 'var(--font-sans)',
+            }}>
+              by {recipe.owner_name}
+            </p>
+          )}
+
           <h3 style={{
             fontSize: '16px',
             fontWeight: 600,
@@ -81,8 +145,6 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
             lineHeight: 1.3,
             color: 'var(--color-text)',
             marginBottom: '9px',
-            // Fixed height for exactly 2 lines (16px × 1.3 × 2 = 41.6px → 42px)
-            // ensures all cards are the same height regardless of title length.
             height: '42px',
             display: '-webkit-box',
             WebkitLineClamp: 2,

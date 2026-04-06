@@ -1,12 +1,13 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import { useMobile } from '../../hooks/useMobile'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useRecipe, usePublishRecipe, useDeleteRecipe, useRecipeNutrition, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
+import { useRecipe, usePublishRecipe, useDeleteRecipe, useRecipeNutrition, useSaveRecipe, useUnsaveRecipe, RecipeIngredient, Instruction, Tag } from '../../api/recipes'
 import { useCookbooks, useAddRecipeToCookbook } from '../../api/cookbooks'
 import { useAddRecipeToGrocery } from '../../api/grocery'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { useConfirm } from '../../components/ui/ConfirmModal'
+import { useAuthStore } from '../../store/authStore'
 
 function formatQty(n: number): string {
   if (n === Math.round(n)) return String(Math.round(n))
@@ -147,10 +148,13 @@ export default function RecipeDetailPage() {
   const isMobile = useMobile()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const currentUser = useAuthStore((s) => s.user)
   const { data: recipe, isLoading } = useRecipe(id!)
   const { data: nutrition } = useRecipeNutrition(id!)
   const publishMutation = usePublishRecipe(id!)
   const deleteMutation = useDeleteRecipe()
+  const saveMutation = useSaveRecipe()
+  const unsaveMutation = useUnsaveRecipe()
   const addToGrocery = useAddRecipeToGrocery()
   const addToCookbook = useAddRecipeToCookbook()
   const { data: cookbooks } = useCookbooks()
@@ -161,6 +165,8 @@ export default function RecipeDetailPage() {
   const [mobileTab, setMobileTab] = useState<'ingredients' | 'instructions'>('ingredients')
   const [cookbookModal, setCookbookModal] = useState(false)
   const [groceryMsg, setGroceryMsg] = useState('')
+
+  const isOwner = recipe ? (recipe.is_owner ?? recipe.owner_id === currentUser?.id) : false
 
   if (isLoading) {
     return <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Loading...</div>
@@ -201,7 +207,7 @@ export default function RecipeDetailPage() {
         to="/recipes"
         style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '20px' }}
       >
-        ← All Recipes
+        ← {isOwner ? 'All Recipes' : 'Back'}
       </Link>
 
       {recipe.cover_url ? (
@@ -223,25 +229,40 @@ export default function RecipeDetailPage() {
       {/* Title + management actions */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '12px' }}>
         <div>
-          {recipe.status === 'draft' && (
+          {recipe.status === 'draft' && isOwner && (
             <span style={{ fontSize: '11px', fontWeight: 600, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '999px', marginBottom: '8px', display: 'inline-block' }}>
-              DRAFT
+              PRIVATE
             </span>
           )}
           <h1 style={{ fontSize: '30px', fontWeight: 700, lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>{recipe.title}</h1>
-          {recipe.owner_name && (
+          {recipe.owner_name && !isOwner && (
             <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '4px' }}>by {recipe.owner_name}</p>
           )}
         </div>
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-          <Button variant="secondary" onClick={() => navigate(`/recipes/${id}/edit`)}>Edit</Button>
-          <Button
-            variant={recipe.status === 'published' ? 'ghost' : 'primary'}
-            loading={publishMutation.isPending}
-            onClick={() => publishMutation.mutate()}
-          >
-            {recipe.status === 'published' ? 'Unpublish' : 'Publish'}
-          </Button>
+          {isOwner ? (
+            <>
+              <Button variant="secondary" onClick={() => navigate(`/recipes/${id}/edit`)}>Edit</Button>
+              <Button
+                variant={recipe.status === 'published' ? 'ghost' : 'primary'}
+                loading={publishMutation.isPending}
+                onClick={() => publishMutation.mutate()}
+              >
+                {recipe.status === 'published' ? 'Make Private' : 'Make Public'}
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant={recipe.is_saved ? 'ghost' : 'primary'}
+              loading={saveMutation.isPending || unsaveMutation.isPending}
+              onClick={() => {
+                if (recipe.is_saved) unsaveMutation.mutate(id!)
+                else saveMutation.mutate(id!)
+              }}
+            >
+              {recipe.is_saved ? '🔖 Saved' : '🔖 Save Recipe'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -478,12 +499,14 @@ export default function RecipeDetailPage() {
         </div>
       )}
 
-      {/* Bottom actions */}
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <Button variant="danger" loading={deleteMutation.isPending} onClick={handleDelete}>
-          Delete Recipe
-        </Button>
-      </div>
+      {/* Bottom actions — owner only */}
+      {isOwner && (
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Button variant="danger" loading={deleteMutation.isPending} onClick={handleDelete}>
+            Delete Recipe
+          </Button>
+        </div>
+      )}
 
       {recipe.source_url && (
         <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '24px' }}>

@@ -31,7 +31,7 @@ export default function SearchPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '20px' }}>Search Recipes</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '20px', fontFamily: 'var(--font-display)' }}>Search Recipes</h1>
 
       {/* Search bar */}
       <div style={{ marginBottom: '28px' }}>

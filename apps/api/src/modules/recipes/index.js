@@ -24,8 +24,25 @@ async function getRecipeOrThrow(id, userId) {
   return recipe
 }
 
-async function getRecipeWithContent(id, userId) {
-  await getRecipeOrThrow(id, userId)
+// Allows owner OR any viewer for published recipes. Returns is_owner + is_saved.
+async function getRecipeForViewer(id, viewerUserId) {
+  const { rows: [recipe] } = await pool.query(
+    `SELECT r.*,
+            COALESCE(p.display_name, u.username) AS owner_name,
+            m.url AS cover_url,
+            (r.owner_id = $2) AS is_owner,
+            CASE WHEN sr.user_id IS NOT NULL THEN true ELSE false END AS is_saved
+     FROM recipes r
+     LEFT JOIN profiles p      ON p.user_id = r.owner_id
+     LEFT JOIN users u         ON u.id = r.owner_id
+     LEFT JOIN media_assets m  ON m.id = r.cover_media_id
+     LEFT JOIN saved_recipes sr ON sr.recipe_id = r.id AND sr.user_id = $2
+     WHERE r.id = $1
+       AND r.deleted_at IS NULL
+       AND (r.owner_id = $2 OR r.status = 'published')`,
+    [id, viewerUserId]
+  )
+  if (!recipe) throw new AppError('Recipe not found', 404)
 
   const [{ rows: ingredients }, { rows: instructions }, { rows: tags }] = await Promise.all([
     pool.query(
@@ -48,18 +65,11 @@ async function getRecipeWithContent(id, userId) {
     ),
   ])
 
-  const { rows: [recipe] } = await pool.query(
-    `SELECT r.*,
-            p.display_name AS owner_name,
-            m.url AS cover_url
-     FROM recipes r
-     LEFT JOIN profiles p ON p.user_id = r.owner_id
-     LEFT JOIN media_assets m ON m.id = r.cover_media_id
-     WHERE r.id = $1`,
-    [id]
-  )
-
   return { ...recipe, ingredients, instructions, tags }
+}
+
+async function getRecipeWithContent(id, userId) {
+  return getRecipeForViewer(id, userId)
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +78,7 @@ async function getRecipeWithContent(id, userId) {
 router.get(
   '/',
   [
-    query('status').optional().isIn(['draft', 'published']),
+    query('status').optional().isIn(['draft', 'published', 'saved']),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
     query('cursor').optional().isISO8601(),
     validate,
@@ -76,9 +86,43 @@ router.get(
   asyncHandler(async (req, res) => {
     const limit = req.query.limit ?? 24
     const { status, cursor } = req.query
+    const userId = req.user.sub
 
+    // "saved" is a virtual status — pull from saved_recipes join instead of own recipes
+    if (status === 'saved') {
+      const conditions = ['s.user_id = $1', 'r.deleted_at IS NULL']
+      const params = [userId]
+      if (cursor) {
+        params.push(cursor)
+        conditions.push(`s.created_at < $${params.length}`)
+      }
+      params.push(limit + 1)
+      const { rows } = await pool.query(
+        `SELECT r.id, r.title, r.status, r.cuisine, r.difficulty,
+                r.prep_time_mins, r.cook_time_mins, r.base_servings,
+                r.owner_id, s.created_at, r.updated_at,
+                m.url AS cover_url,
+                COALESCE(p.display_name, u.username) AS owner_name,
+                true AS is_saved
+         FROM saved_recipes s
+         JOIN recipes r       ON r.id = s.recipe_id
+         LEFT JOIN media_assets m  ON m.id = r.cover_media_id
+         LEFT JOIN profiles p      ON p.user_id = r.owner_id
+         LEFT JOIN users u         ON u.id = r.owner_id
+         WHERE ${conditions.join(' AND ')}
+         ORDER BY s.created_at DESC
+         LIMIT $${params.length}`,
+        params
+      )
+      const hasMore = rows.length > limit
+      const data = hasMore ? rows.slice(0, limit) : rows
+      const nextCursor = hasMore ? data[data.length - 1].created_at : null
+      return res.json({ data, cursor: nextCursor, limit })
+    }
+
+    // Own recipes
     const conditions = ['r.owner_id = $1', 'r.deleted_at IS NULL']
-    const params = [req.user.sub]
+    const params = [userId]
 
     if (status) {
       params.push(status)
@@ -93,8 +137,9 @@ router.get(
     const { rows } = await pool.query(
       `SELECT r.id, r.title, r.status, r.cuisine, r.difficulty,
               r.prep_time_mins, r.cook_time_mins, r.base_servings,
-              r.cover_media_id, r.created_at, r.updated_at,
-              m.url AS cover_url
+              r.owner_id, r.created_at, r.updated_at,
+              m.url AS cover_url,
+              false AS is_saved
        FROM recipes r
        LEFT JOIN media_assets m ON m.id = r.cover_media_id
        WHERE ${conditions.join(' AND ')}
@@ -142,14 +187,52 @@ router.post(
 )
 
 // ---------------------------------------------------------------------------
-// GET /api/recipes/:id
+// GET /api/recipes/:id  — owner OR any viewer for published recipes
 // ---------------------------------------------------------------------------
 router.get(
   '/:id',
   [param('id').isUUID(), validate],
   asyncHandler(async (req, res) => {
-    const recipe = await getRecipeWithContent(req.params.id, req.user.sub)
+    const recipe = await getRecipeForViewer(req.params.id, req.user.sub)
     res.json(recipe)
+  })
+)
+
+// ---------------------------------------------------------------------------
+// POST /api/recipes/:id/save  — save (bookmark) a recipe
+// ---------------------------------------------------------------------------
+router.post(
+  '/:id/save',
+  [param('id').isUUID(), validate],
+  asyncHandler(async (req, res) => {
+    const { rows: [recipe] } = await pool.query(
+      `SELECT id, owner_id, status FROM recipes WHERE id = $1 AND deleted_at IS NULL`,
+      [req.params.id]
+    )
+    if (!recipe) throw new AppError('Recipe not found', 404)
+    if (recipe.owner_id === req.user.sub) throw new AppError('Cannot save your own recipe', 400)
+    if (recipe.status !== 'published') throw new AppError('Recipe is not public', 403)
+
+    await pool.query(
+      `INSERT INTO saved_recipes (user_id, recipe_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [req.user.sub, req.params.id]
+    )
+    res.json({ saved: true })
+  })
+)
+
+// ---------------------------------------------------------------------------
+// DELETE /api/recipes/:id/save  — unsave (unbookmark) a recipe
+// ---------------------------------------------------------------------------
+router.delete(
+  '/:id/save',
+  [param('id').isUUID(), validate],
+  asyncHandler(async (req, res) => {
+    await pool.query(
+      `DELETE FROM saved_recipes WHERE user_id = $1 AND recipe_id = $2`,
+      [req.user.sub, req.params.id]
+    )
+    res.json({ saved: false })
   })
 )
 
@@ -361,7 +444,13 @@ router.get(
   '/:id/nutrition',
   [param('id').isUUID(), validate],
   asyncHandler(async (req, res) => {
-    const recipe = await getRecipeOrThrow(req.params.id, req.user.sub)
+    // Allow owner or any viewer of a published recipe
+    const { rows: [recipe] } = await pool.query(
+      `SELECT id, base_servings FROM recipes
+       WHERE id = $1 AND deleted_at IS NULL AND (owner_id = $2 OR status = 'published')`,
+      [req.params.id, req.user.sub]
+    )
+    if (!recipe) throw new AppError('Recipe not found', 404)
     const { rows: [snapshot] } = await pool.query(
       `SELECT total_nutrients, per_serving, computed_at, is_estimated
        FROM nutrition_snapshots WHERE recipe_id = $1`,
